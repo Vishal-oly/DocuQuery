@@ -1,0 +1,49 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1162 >>
+stream
+BT
+/F1 10 Tf
+1 0 0 1 48 750 Tm (Demo Study: Page-Aware Retrieval for Scientific Papers) Tj
+1 0 0 1 48 708 Tm (Abstract) Tj
+1 0 0 1 48 666 Tm (This synthetic example tests a page-aware retrieval workflow for research-paper PDFs.) Tj
+1 0 0 1 48 624 Tm (It is provided only to test PaperPilot; every result and number is fictional.) Tj
+1 0 0 1 48 582 Tm (Introduction) Tj
+1 0 0 1 48 540 Tm (Scientific articles can be difficult to review when evidence is spread over many pages.) Tj
+1 0 0 1 48 498 Tm (Methods) Tj
+1 0 0 1 48 456 Tm (We use overlapping text chunks, section labels, and page metadata for evidence retrieval.) Tj
+1 0 0 1 48 414 Tm (A small synthetic benchmark contains 120 papers and 600 manually written questions.) Tj
+1 0 0 1 48 372 Tm (Results) Tj
+1 0 0 1 48 330 Tm (In this fictional test, page-aware retrieval improves evidence precision by 14 percent.) Tj
+1 0 0 1 48 288 Tm (Limitations) Tj
+1 0 0 1 48 246 Tm (This invented example uses only selectable English text and does not evaluate scanned PDFs.) Tj
+1 0 0 1 48 204 Tm (Conclusion) Tj
+1 0 0 1 48 162 Tm (Page references can help readers verify summaries against the original article.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1525
+%%EOF

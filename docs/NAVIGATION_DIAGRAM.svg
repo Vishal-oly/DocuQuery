@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" role="img" aria-labelledby="title desc">
+  <title id="title">DocuQuery – Navigation Diagram</title>
+  <desc id="desc">A reference-style navigation diagram adapted to the scientific-paper RAG project: workspace sections, PDF upload, summary, evidence, questions, paper library, and backend components.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#17365d"/>
+    </marker>
+    <marker id="arrow-start" viewBox="0 0 10 10" refX="1.5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M10 0L0 5L10 10Z" fill="#17365d"/>
+    </marker>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif;fill:#14263d}
+      .title{font-size:25px;font-weight:700;fill:#123568}
+      .top-title{font-size:24px;font-weight:700}
+      .top-sub{font-size:20px}
+      .nav{font-size:17px;font-weight:700}
+      .card-title{font-size:18px;font-weight:700}
+      .body{font-size:16px}
+      .bottom-title{font-size:18px;font-weight:700}
+      .bottom-body{font-size:15px}
+      .connector{fill:none;stroke:#17365d;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+      .card{stroke-width:2}
+    </style>
+  </defs>
+  <rect width="1536" height="1024" fill="#ffffff"/>
+
+  <!-- Title -->
+  <rect x="25" y="28" width="524" height="69" rx="11" fill="#eaf2ff" stroke="#76a9ee" stroke-width="2.5"/>
+  <text x="47" y="72" class="title">DocuQuery – Navigation Diagram</text>
+
+  <!-- Connectors behind cards -->
+  <path class="connector" d="M770 286V318" marker-end="url(#arrow)"/>
+  <path class="connector" d="M680 382V408H155M680 408H1418"/>
+  <path class="connector" d="M155 408V453" marker-end="url(#arrow)"/>
+  <path class="connector" d="M420 408V453" marker-end="url(#arrow)"/>
+  <path class="connector" d="M681 408V453" marker-end="url(#arrow)"/>
+  <path class="connector" d="M943 408V453" marker-end="url(#arrow)"/>
+  <path class="connector" d="M1193 408V453" marker-end="url(#arrow)"/>
+  <path class="connector" d="M1418 408V453" marker-end="url(#arrow)"/>
+
+  <!-- Backend feeds the upload, brief, and question workflow -->
+  <path class="connector" d="M738 751V688H420M738 688H1193"/>
+  <path class="connector" d="M420 688V657" marker-end="url(#arrow)"/>
+  <path class="connector" d="M681 688V657" marker-end="url(#arrow)"/>
+  <path class="connector" d="M1193 688V657" marker-end="url(#arrow)"/>
+  <path class="connector" d="M450 837H555" marker-start="url(#arrow-start)" marker-end="url(#arrow)"/>
+  <path class="connector" d="M922 837H1024" marker-start="url(#arrow-start)" marker-end="url(#arrow)"/>
+
+  <!-- DocuQuery workspace entry -->
+  <rect x="579" y="86" width="382" height="200" rx="13" fill="#f4f8fe" stroke="#17365d" class="card"/>
+  <path d="M592 87H948Q960 87 960 99V170H580V99Q580 87 592 87Z" fill="#d9eaff"/>
+  <line x1="581" y1="170" x2="959" y2="170" stroke="#b7cce7" stroke-width="1.2"/>
+  <text x="770" y="120" text-anchor="middle" class="top-title">DocuQuery Workspace</text>
+  <text x="770" y="155" text-anchor="middle" class="top-sub">(Scientific Paper RAG)</text>
+  <text x="613" y="204" class="body">•  Upload or reopen a PDF</text>
+  <text x="613" y="235" class="body">•  Read the research brief</text>
+  <text x="613" y="266" class="body">•  Ask with page sources</text>
+
+  <!-- Workspace sections bar -->
+  <rect x="280" y="325" width="976" height="58" rx="12" fill="#eee8ff" stroke="#5e42a6" stroke-width="2"/>
+  <text x="361" y="361" text-anchor="middle" class="nav">Workspace</text>
+  <text x="524" y="361" text-anchor="middle" class="nav">Upload PDF</text>
+  <text x="687" y="361" text-anchor="middle" class="nav">Research Brief</text>
+  <text x="850" y="361" text-anchor="middle" class="nav">Evidence Trail</text>
+  <text x="1013" y="361" text-anchor="middle" class="nav">Ask This Paper</text>
+  <text x="1175" y="361" text-anchor="middle" class="nav">Paper Library</text>
+
+  <!-- Workspace card -->
+  <rect x="34" y="460" width="245" height="193" rx="12" fill="#f7faff" stroke="#28558b" class="card"/>
+  <path d="M46 461H267Q278 461 278 472V518H35V472Q35 461 46 461Z" fill="#d9eaff"/>
+  <line x1="36" y1="518" x2="277" y2="518" stroke="#9eb9d9" stroke-width="1.2"/>
+  <text x="156.5" y="496" text-anchor="middle" class="card-title">Workspace</text>
+  <text x="55" y="553" class="body">•  Research overview</text>
+  <text x="55" y="584" class="body">•  Active paper status</text>
+  <text x="55" y="615" class="body">•  Upload or revisit</text>
+
+  <!-- Upload PDF card -->
+  <rect x="300" y="460" width="240" height="193" rx="12" fill="#f7fcf5" stroke="#34864a" class="card"/>
+  <path d="M312 461H528Q539 461 539 472V518H301V472Q301 461 312 461Z" fill="#ddf1d9"/>
+  <line x1="302" y1="518" x2="538" y2="518" stroke="#a8c9a4" stroke-width="1.2"/>
+  <text x="420" y="496" text-anchor="middle" class="card-title">Upload PDF</text>
+  <text x="321" y="553" class="body">•  Browse or drop file</text>
+  <text x="321" y="584" class="body">•  PDF · up to 20 MB</text>
+  <text x="321" y="615" class="body">•  Start processing</text>
+
+  <!-- Research brief card -->
+  <rect x="558" y="460" width="246" height="193" rx="12" fill="#fffdf4" stroke="#b69510" class="card"/>
+  <path d="M570 461H792Q803 461 803 472V518H559V472Q559 461 570 461Z" fill="#fff0b2"/>
+  <line x1="560" y1="518" x2="802" y2="518" stroke="#d5c46c" stroke-width="1.2"/>
+  <text x="681" y="496" text-anchor="middle" class="card-title">Research Brief</text>
+  <text x="578" y="553" class="body">•  Objective · methods · data</text>
+  <text x="578" y="584" class="body">•  Findings · limitations</text>
+  <text x="578" y="615" class="body">•  Conclusion · overview</text>
+
+  <!-- Evidence trail card -->
+  <rect x="824" y="460" width="239" height="193" rx="12" fill="#fcf9ff" stroke="#6a47b6" class="card"/>
+  <path d="M836 461H1051Q1062 461 1062 472V518H825V472Q825 461 836 461Z" fill="#e8dcff"/>
+  <line x1="826" y1="518" x2="1061" y2="518" stroke="#b7a4df" stroke-width="1.2"/>
+  <text x="943.5" y="496" text-anchor="middle" class="card-title">Evidence Trail</text>
+  <text x="844" y="553" class="body">•  Retrieved passages</text>
+  <text x="844" y="584" class="body">•  Page references</text>
+  <text x="844" y="615" class="body">•  Verify in original PDF</text>
+
+  <!-- Ask this paper card -->
+  <rect x="1081" y="460" width="223" height="193" rx="12" fill="#f6fcfc" stroke="#2a8588" class="card"/>
+  <path d="M1093 461H1292Q1303 461 1303 472V518H1082V472Q1082 461 1093 461Z" fill="#d5f0f1"/>
+  <line x1="1083" y1="518" x2="1302" y2="518" stroke="#a4d2d3" stroke-width="1.2"/>
+  <text x="1192.5" y="496" text-anchor="middle" class="card-title">Ask This Paper</text>
+  <text x="1101" y="553" class="body">•  Ask a question</text>
+  <text x="1101" y="584" class="body">•  Use suggested prompts</text>
+  <text x="1101" y="615" class="body">•  Get cited answer</text>
+
+  <!-- Paper library card -->
+  <rect x="1325" y="460" width="188" height="193" rx="12" fill="#fff8f8" stroke="#b73c43" class="card"/>
+  <path d="M1337 461H1501Q1512 461 1512 472V518H1326V472Q1326 461 1337 461Z" fill="#f8dddd"/>
+  <line x1="1327" y1="518" x2="1511" y2="518" stroke="#d9a5a8" stroke-width="1.2"/>
+  <text x="1419" y="496" text-anchor="middle" class="card-title">Paper Library</text>
+  <text x="1344" y="553" class="body">•  Session papers</text>
+  <text x="1344" y="584" class="body">•  Reopen paper</text>
+  <text x="1344" y="615" class="body">•  Remove paper</text>
+
+  <!-- Vector database -->
+  <rect x="145" y="771" width="305" height="133" rx="12" fill="#fbfaff" stroke="#5940a6" class="card"/>
+  <path d="M157 772H438Q449 772 449 783V817H146V783Q146 772 157 772Z" fill="#e3defe"/>
+  <line x1="147" y1="817" x2="448" y2="817" stroke="#b7addd" stroke-width="1.2"/>
+  <text x="297.5" y="800" text-anchor="middle" class="bottom-title">Vector Database</text>
+  <text x="167" y="846" class="bottom-body">•  Supabase pgvector</text>
+  <text x="167" y="871" class="bottom-body">•  SQLite local fallback</text>
+  <text x="167" y="896" class="bottom-body">•  Store and search vectors</text>
+
+  <!-- Backend processing -->
+  <rect x="555" y="751" width="367" height="204" rx="12" fill="#f8fafc" stroke="#405a77" class="card"/>
+  <path d="M567 752H910Q921 752 921 763V798H556V763Q556 752 567 752Z" fill="#dfe7ef"/>
+  <line x1="557" y1="798" x2="920" y2="798" stroke="#b4c1ce" stroke-width="1.2"/>
+  <text x="738.5" y="781" text-anchor="middle" class="bottom-title">Backend Processing</text>
+  <text x="586" y="827" class="bottom-body">•  Extract page-wise PDF text</text>
+  <text x="586" y="855" class="bottom-body">•  Detect sections and chunk</text>
+  <text x="586" y="883" class="bottom-body">•  Create 384-D embeddings</text>
+  <text x="586" y="911" class="bottom-body">•  Retrieve relevant passages</text>
+  <text x="586" y="939" class="bottom-body">•  Build brief and cite pages</text>
+
+  <!-- Groq / RAG -->
+  <rect x="1024" y="771" width="301" height="136" rx="12" fill="#f5fcff" stroke="#2689b4" class="card"/>
+  <path d="M1036 772H1313Q1324 772 1324 783V817H1025V783Q1025 772 1036 772Z" fill="#d9f1ff"/>
+  <line x1="1026" y1="817" x2="1323" y2="817" stroke="#a4d0e3" stroke-width="1.2"/>
+  <text x="1174.5" y="800" text-anchor="middle" class="bottom-title">Groq LLM (RAG)</text>
+  <text x="1046" y="846" class="bottom-body">•  Structured summary</text>
+  <text x="1046" y="871" class="bottom-body">•  Grounded Q&amp;A</text>
+  <text x="1046" y="896" class="bottom-body">•  Preview fallback</text>
+</svg>

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8fc">
+  <meta name="description" content="DocuQuery — a retrieval-augmented research assistant for scientific paper PDFs. Upload a paper, get an evidence-grounded brief, and ask questions with page-linked sources.">
+  <title>DocuQuery — Scientific Paper Research Assistant</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=4) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=4) }}" rel="stylesheet">
+</head>
+<body class="landing-body">
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="DocuQuery home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 36 36" role="img"><path d="M8 6.8c3.5-.8 6.8-.2 10 1.7v21c-3.2-1.9-6.5-2.5-10-1.7V6.8Z"/><path d="M28 6.8c-3.5-.8-6.8-.2-10 1.7v21c3.2-1.9 6.5-2.5 10-1.7V6.8Z"/><path d="M18 8.5v21"/></svg>
+        </span>
+        <span class="brand-name">Docu<span>Query</span></span>
+      </a>
+      <nav class="landing-nav" aria-label="Main navigation">
+        <a href="#about">About</a>
+        <a href="#features">Features</a>
+        <a href="#howItWorks">How it works</a>
+        {% if user %}
+          <a class="btn btn-ghost" href="/workspace">My Workspace</a>
+          <a class="btn btn-primary-soft" href="#" id="landingLogout">Logout</a>
+        {% else %}
+          <a class="btn btn-ghost" href="/login">Login</a>
+          <a class="btn btn-primary-soft" href="/login?mode=register">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main id="mainContent">
+    <!-- Hero: project name & about -->
+    <section class="landing-hero" id="about">
+      <div class="landing-hero-copy">
+        <div class="eyebrow"><span class="eyebrow-spark">✳</span> SCIENTIFIC PAPER RESEARCH ASSISTANT</div>
+        <h1>Read less.<br><span>Understand more.</span></h1>
+        <p class="landing-lead">
+          <strong>DocuQuery</strong> is a retrieval-augmented web assistant for scientific-paper PDFs.
+          Upload a research paper and get a structured research brief, page-linked evidence,
+          and grounded answers to your questions — so every claim can be traced back to the source.
+        </p>
+        <div class="landing-cta">
+          {% if user %}
+            <a class="btn btn-primary-soft btn-lg-soft" href="/workspace">Open my workspace →</a>
+          {% else %}
+            <a class="btn btn-primary-soft btn-lg-soft" href="/login">Login</a>
+            <a class="btn btn-outline-soft btn-lg-soft" href="/login?mode=register">Create account</a>
+          {% endif %}
+        </div>
+        <div class="hero-meta">
+          <span><span class="meta-check">✓</span> Page-linked sources</span>
+          <span><span class="meta-check">✓</span> Structured research briefs</span>
+          <span><span class="meta-check">✓</span> Ask this paper anything</span>
+        </div>
+      </div>
+      <div class="landing-hero-art" aria-hidden="true">
+        <div class="landing-art-card landing-art-paper">
+          <div class="paper-art-title"></div>
+          <div class="paper-art-title narrow"></div>
+          <div class="paper-art-rule"></div>
+          <div class="paper-art-label">ABSTRACT</div>
+          <div class="paper-art-line"></div><div class="paper-art-line"></div><div class="paper-art-line mid"></div>
+          <div class="paper-art-label second">KEY FINDINGS</div>
+          <div class="paper-art-line"></div><div class="paper-art-line mid"></div>
+          <span class="page-chip">p. 04</span>
+        </div>
+        <div class="landing-art-card landing-art-answer">
+          <span class="sparkle">✦</span>
+          <div>
+            <strong>Grounded answer</strong>
+            <p>“…as shown on page 4.”</p>
+          </div>
+          <span class="citation-chip">[p. 4]</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="landing-section" id="features">
+      <div class="section-kicker">WHAT YOU GET</div>
+      <h2>Everything a careful reader needs</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <div class="feature-icon">⇪</div>
+          <h3>Upload PDF</h3>
+          <p>Drop in a text-based research paper (up to 20 MB). DocuQuery extracts the text page by page and indexes it.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">✦</div>
+          <h3>Research Brief</h3>
+          <p>A structured summary covering objective, methodology, data, key findings, limitations, and conclusion.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">↗</div>
+          <h3>Evidence Trail</h3>
+          <p>Every summary field and answer is backed by retrieved excerpts with page numbers and section labels.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">⌕</div>
+          <h3>Ask This Paper</h3>
+          <p>Ask a focused question and get a grounded answer with citations — or the closest passages if no model is configured.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="landing-section landing-section-alt" id="howItWorks">
+      <div class="section-kicker">HOW IT WORKS</div>
+      <h2>From PDF to grounded answer</h2>
+      <div class="steps-row">
+        <div class="step-card"><span class="step-num">01</span><strong>Upload</strong><p>Validate and extract text page by page</p></div>
+        <div class="step-arrow" aria-hidden="true">→</div>
+        <div class="step-card"><span class="step-num">02</span><strong>Index</strong><p>Section detection, chunking, embeddings</p></div>
+        <div class="step-arrow" aria-hidden="true">→</div>
+        <div class="step-card"><span class="step-num">03</span><strong>Retrieve</strong><p>Find the most relevant passages</p></div>
+        <div class="step-arrow" aria-hidden="true">→</div>
+        <div class="step-card"><span class="step-num">04</span><strong>Answer</strong><p>Generate a brief with page-linked evidence</p></div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <section class="landing-cta-band">
+      <h2>Ready to read smarter?</h2>
+      <p>Create a free account to save your papers and research briefs across sessions.</p>
+      {% if user %}
+        <a class="btn btn-primary-soft btn-lg-soft" href="/workspace">Open my workspace →</a>
+      {% else %}
+        <a class="btn btn-primary-soft btn-lg-soft" href="/login?mode=register">Get started free</a>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="app-footer landing-footer">
+    <span>DocuQuery <span class="footer-separator">·</span> RAG for scientific reading</span>
+    <span>Minor project · Built with Flask, Supabase &amp; Groq</span>
+  </footer>
+
+  <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
+  <script src="{{ url_for('static', filename='auth.js', v=4) }}" defer></script>
+</body>
+</html>

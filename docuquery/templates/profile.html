@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8fc">
+  <title>Profile — DocuQuery</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=4) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=4) }}" rel="stylesheet">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/workspace" aria-label="DocuQuery workspace">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 36 36" role="img"><path d="M8 6.8c3.5-.8 6.8-.2 10 1.7v21c-3.2-1.9-6.5-2.5-10-1.7V6.8Z"/><path d="M28 6.8c-3.5-.8-6.8-.2-10 1.7v21c3.2-1.9 6.5-2.5 10-1.7V6.8Z"/><path d="M18 8.5v21"/></svg>
+        </span>
+        <span class="brand-name">Docu<span>Query</span></span>
+      </a>
+      <div class="topbar-nav">
+        <nav class="landing-nav" aria-label="Main navigation">
+          <a href="/workspace">Workspace</a>
+          <a href="/summaries">Summaries</a>
+          <a class="active-nav" href="/profile">Profile</a>
+        </nav>
+        <span class="user-chip" id="userChip" title="Signed in account">
+          <span class="user-chip-avatar" aria-hidden="true">{{ (user.name or 'U')|upper|first }}</span>
+          <span class="user-chip-name">{{ user.name }}</span>
+        </span>
+        <button class="logout-button" id="logoutButton" type="button">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-container" id="mainContent">
+    <div class="workspace-heading">
+      <div>
+        <div class="section-kicker">YOUR ACCOUNT</div>
+        <h2>Profile</h2>
+      </div>
+      <div class="workspace-caption"><span class="tiny-shield">◆</span> Manage your details, files, and settings</div>
+    </div>
+
+    <div id="profileAlert" class="alert-panel" role="status" hidden></div>
+
+    <div class="profile-grid">
+      <!-- User details -->
+      <section class="profile-card">
+        <div class="profile-card-head">
+          <div class="profile-avatar" id="profileAvatar" aria-hidden="true">U</div>
+          <div>
+            <h3 id="profileName">—</h3>
+            <p id="profileEmail">—</p>
+            <p class="profile-joined" id="profileJoined">—</p>
+          </div>
+        </div>
+        <h4 class="profile-subhead">User details</h4>
+        <form id="nameForm">
+          <div class="form-field">
+            <label for="nameInput">Display name</label>
+            <input id="nameInput" type="text" maxlength="60" placeholder="Your name">
+            <div class="field-error" id="nameError" hidden></div>
+          </div>
+          <button class="btn btn-primary-soft" id="saveNameButton" type="button">Save changes</button>
+        </form>
+      </section>
+
+      <!-- Security -->
+      <section class="profile-card">
+        <h3 class="profile-card-title">Security</h3>
+        <h4 class="profile-subhead">Change password</h4>
+        <form id="passwordForm">
+          <div class="form-field">
+            <label for="currentPassword">Current password</label>
+            <input id="currentPassword" type="password" autocomplete="current-password" maxlength="128">
+            <div class="field-error" id="currentPasswordError" hidden></div>
+          </div>
+          <div class="form-field">
+            <label for="newPassword">New password</label>
+            <input id="newPassword" type="password" autocomplete="new-password" placeholder="Minimum 6 characters" maxlength="128">
+            <div class="field-error" id="newPasswordError" hidden></div>
+          </div>
+          <button class="btn btn-primary-soft" id="updatePasswordButton" type="button">Update password</button>
+        </form>
+        <p class="profile-hint">Forgot your password? <a href="/forgot">Reset it here</a>.</p>
+      </section>
+
+      <!-- Settings / app status -->
+      <section class="profile-card">
+        <h3 class="profile-card-title">Settings</h3>
+        <h4 class="profile-subhead">Application status</h4>
+        <ul class="settings-list">
+          <li><span>Database</span><strong id="settingDatabase">—</strong></li>
+          <li><span>Language model</span><strong id="settingLlm">—</strong></li>
+          <li><span>Embeddings</span><strong id="settingEmbedding">—</strong></li>
+          <li><span>Upload limit</span><strong id="settingUpload">—</strong></li>
+        </ul>
+        <p class="profile-hint">Service credentials are configured on the server (see <code>.env</code>).</p>
+      </section>
+
+      <!-- Uploaded files -->
+      <section class="profile-card profile-card-wide">
+        <div class="profile-card-title-row">
+          <h3 class="profile-card-title">Uploaded files</h3>
+          <span id="filesCount" class="library-count">0</span>
+        </div>
+        <div id="filesList" class="files-list">
+          <div class="library-empty">Papers you upload will appear here.</div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="app-footer">
+      <span>DocuQuery <span class="footer-separator">·</span> RAG for scientific reading</span>
+      <span id="footerStatus">Ready when you are</span>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
+  <script src="{{ url_for('static', filename='dq.js', v=4) }}" defer></script>
+  <script src="{{ url_for('static', filename='profile.js', v=4) }}" defer></script>
+</body>
+</html>
