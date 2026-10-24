@@ -33,6 +33,9 @@ class Config:
     GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
 
     SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+    # Google Sign-In (Identity Services). Create an OAuth Client ID in Google Cloud
+    # Console and paste just the client id here.
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
     # This is a server-only key. Never put it in JavaScript or a public repo.
     SUPABASE_SERVICE_ROLE_KEY = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()

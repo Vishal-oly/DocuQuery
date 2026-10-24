@@ -69,7 +69,21 @@ window.DQAuth = (() => {
     if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`;
     // Send the token in the URL too: some preview proxies strip the Authorization
     // header, and the server accepts either source.
-    return fetch(withToken(url), { ...options, headers });
+    // Never hang forever — if the server dies mid-request, fail with a clear
+    // message instead of leaving the UI stuck on a spinner.
+    const timeoutMs = options.timeoutMs || 90000;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(withToken(url), { ...options, headers, signal: controller.signal });
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        throw new Error('Server is not responding (timed out). Please refresh and try again.');
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   /* Bind a form so its button clicks and Enter keys work even in sandboxed

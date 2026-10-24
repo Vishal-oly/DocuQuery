@@ -12,12 +12,6 @@ create table if not exists public.users (
     created_at timestamptz not null default now()
 );
 
--- For projects created before these columns existed.
-alter table public.users add column if not exists reset_token text;
-alter table public.users add column if not exists reset_expires timestamptz;
-alter table public.papers add column if not exists file_path text;
-alter table public.papers add column if not exists file_size bigint not null default 0;
-
 create table if not exists public.papers (
     id uuid primary key,
     session_id uuid not null,
@@ -28,9 +22,6 @@ create table if not exists public.papers (
     summary jsonb not null default '{}'::jsonb
 );
 
-create index if not exists papers_session_created_idx
-    on public.papers (session_id, created_at desc);
-
 create table if not exists public.paper_chunks (
     id uuid primary key,
     paper_id uuid not null references public.papers(id) on delete cascade,
@@ -40,6 +31,15 @@ create table if not exists public.paper_chunks (
     content text not null,
     embedding extensions.vector(384) not null
 );
+
+-- For projects created before these columns existed.
+alter table public.users add column if not exists reset_token text;
+alter table public.users add column if not exists reset_expires timestamptz;
+alter table public.papers add column if not exists file_path text;
+alter table public.papers add column if not exists file_size bigint not null default 0;
+
+create index if not exists papers_session_created_idx
+    on public.papers (session_id, created_at desc);
 
 create index if not exists paper_chunks_paper_session_idx
     on public.paper_chunks (paper_id, session_id);

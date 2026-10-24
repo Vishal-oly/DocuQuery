@@ -123,6 +123,17 @@ def _guess_title(first_page_text: str, filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ").strip() or "Untitled paper"
 
 
+def _sanitize_text(text: str) -> str:
+    """Strip characters that Postgres text/jsonb cannot store (notably NUL \\x00).
+
+    pypdf can emit null bytes from broken PDF text layers; Postgres rejects them
+    with 'unsupported Unicode escape sequence'. Tab/newline/carriage-return stay.
+    """
+    if not text:
+        return text or ""
+    return text.translate({i: None for i in list(range(0, 9)) + [11, 12] + list(range(14, 32))})
+
+
 def parse_pdf_bytes(
     file_bytes: bytes,
     filename: str,
@@ -149,7 +160,7 @@ def parse_pdf_bytes(
         current_section = "Overview"
         for page_number, page in enumerate(reader.pages, start=1):
             try:
-                page_text = page.extract_text() or ""
+                page_text = _sanitize_text(page.extract_text() or "")
             except Exception:
                 page_text = ""
             raw_pages.append(page_text)
@@ -179,7 +190,7 @@ def parse_pdf_bytes(
 
     joined_text = "\n".join(raw_pages)
     return {
-        "title": _guess_title(raw_pages[0] if raw_pages else "", filename),
+        "title": _sanitize_text(_guess_title(raw_pages[0] if raw_pages else "", filename)),
         "page_count": total_pages,
         "text_char_count": len(joined_text),
         "chunks": chunk_records,

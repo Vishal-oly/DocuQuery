@@ -86,6 +86,29 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 
 The service-role key is used only by the Flask server. It must never be added to browser JavaScript. The SQL enables row-level security and limits direct table access to the server-side service role.
 
+## Optional: Google Sign-In
+
+The login page can show a **Continue with Google** button (one-tap sign-in). Google
+users are signed in instantly; first-time Google emails get an account automatically.
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+2. **Create Credentials** → **OAuth client ID** → Application type **Web application**
+3. Under **Authorized JavaScript origins** add your app URL(s), e.g.:
+   - `http://127.0.0.1:5000`
+   - `http://localhost:5000`
+   - your deployed/preview URL
+4. Copy the **Client ID** and set it in `.env`:
+
+```dotenv
+GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+```
+
+5. Restart Flask. The button appears on `/login`. (No client secret needed — the app
+   verifies Google ID tokens server-side.)
+
+> Note: inside sandboxed preview iframes Google's popup button may not open —
+> open the app in a normal browser tab (or on your laptop) to use Google sign-in.
+
 ## Optional: MiniLM embeddings
 
 The default `hashing` embedder is deterministic, offline, and lightweight. It is a baseline—not a transformer semantic model. To use the optional local Sentence Transformers model:

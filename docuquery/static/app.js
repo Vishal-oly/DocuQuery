@@ -30,6 +30,7 @@
   let toastTimer = null;
   let uploadTimer = null;
   let uploadInProgress = false;
+  let chatEpoch = 0;
 
   function setActiveSection(sectionName) {
     sectionLinks.forEach((link) => {
@@ -134,8 +135,7 @@
   }
 
   function addMessage(role, text, sources = [], mode = '') {
-    if (assistantWelcome && assistantWelcome.isConnected) assistantWelcome.remove();
-    const message = document.createElement('div');
+    if (assistantWelcome && assistantWelcome.isConnected) assistantWelcome.remove();    const message = document.createElement('div');
     message.className = `chat-message ${role}`;
     message.append(textElement('div', 'chat-bubble', text));
     if (role === 'assistant' && sources.length) {
@@ -287,6 +287,7 @@
   async function sendQuestion(question) {
     const cleanQuestion = String(question || '').trim();
     if (!cleanQuestion || !activePaper) return;
+    const epoch = chatEpoch;
     addMessage('user', cleanQuestion);
     chatInput.value = '';
     sendButton.disabled = true;
@@ -299,9 +300,11 @@
         body: JSON.stringify({ question: cleanQuestion }),
       });
       $('#typingIndicator')?.remove();
+      if (epoch !== chatEpoch) return; // chat was cleared while the answer was loading
       addMessage('assistant', payload.answer || 'No answer was returned.', payload.sources || [], payload.mode || '');
     } catch (error) {
       $('#typingIndicator')?.remove();
+      if (epoch !== chatEpoch) return;
       addMessage('assistant', `I couldn't complete that request: ${error.message}`);
     } finally {
       sendButton.disabled = !activePaper;
@@ -335,6 +338,22 @@
   }
 
   browseButton.addEventListener('click', () => pdfInput.click());
+
+  // Clear the chat conversation (keeps the paper + its brief, only wipes messages).
+  const clearChatButton = $('#clearChatButton');
+  if (clearChatButton) {
+    clearChatButton.addEventListener('click', () => {
+      chatEpoch += 1;
+      $('#typingIndicator')?.remove();
+      chatMessages.replaceChildren();
+      if (assistantWelcome) chatMessages.append(assistantWelcome);
+      document.querySelectorAll('.suggestion-chip').forEach((button) => {
+        button.disabled = !activePaper;
+      });
+      sendButton.disabled = !activePaper;
+      showToast(activePaper ? 'Chat history cleared.' : 'Chat is already empty.');
+    });
+  }
   pdfInput.addEventListener('change', (event) => uploadFile(event.target.files[0]));
   dropZone.addEventListener('dragover', (event) => { event.preventDefault(); dropZone.classList.add('is-dragging'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('is-dragging'));

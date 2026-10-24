@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from functools import wraps
 import json
 import re
+import secrets
 import uuid
 
 from itsdangerous import URLSafeTimedSerializer
@@ -26,6 +27,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from .embeddings import EmbeddingError
+from .google_auth import GoogleAuthError, verify_google_credential
 from .pdf_processing import PDFProcessingError, parse_pdf_bytes
 from .rag import answer_question, make_summary
 from .repository import RepositoryError, UserExistsError
@@ -188,6 +190,7 @@ def login_page():
         user=_current_user(),
         next=request.args.get("next", ""),
         mode=request.args.get("mode", "login"),
+        google_client_id=current_app.config.get("GOOGLE_CLIENT_ID", ""),
     )
 
 
@@ -265,6 +268,47 @@ def login():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid email or password."}), 401
 
+    _sign_in(user)
+    return jsonify({"user": _public_user(user), "token": issue_token(str(user["id"]))}), 200
+
+
+@bp.post("/api/auth/google")
+def google_login():
+    """One-tap Google Sign-In: verify the ID token, then create or join the account."""
+    body = request.get_json(silent=True) or {}
+    credential = str(body.get("credential", "")).strip()
+    try:
+        claims = verify_google_credential(
+            credential, current_app.config.get("GOOGLE_CLIENT_ID", "")
+        )
+    except GoogleAuthError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    email = str(claims.get("email", "")).strip().lower()
+    name = str(
+        claims.get("name") or claims.get("given_name") or email.split("@")[0]
+    ).strip()[:60] or "Google User"
+
+    try:
+        user = _repository().get_user_by_email(email)
+        if not user:
+            user = _repository().save_user(
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": name,
+                    "email": email,
+                    # Google users get a random unusable password; they sign in with Google.
+                    "password_hash": generate_password_hash(secrets.token_urlsafe(32)),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+    except UserExistsError:  # two simultaneous first-time sign-ins for one email
+        user = _repository().get_user_by_email(email)
+    except RepositoryError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+    if not user:
+        return jsonify({"error": "Could not create your account."}), 500
     _sign_in(user)
     return jsonify({"user": _public_user(user), "token": issue_token(str(user["id"]))}), 200
 
@@ -557,6 +601,32 @@ def delete_paper(paper_id: str):
             _storage().delete(paper["file_path"])
         _storage().delete_paper(paper_id)
         return jsonify({"deleted": True})
+    except RepositoryError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+
+@bp.post("/api/me/clear-history")
+@api_login_required
+def clear_history():
+    """Delete every paper for this account: briefs, chunks, and stored PDFs."""
+    try:
+        session_id = _session_id()
+        papers = _repository().list_papers(session_id)
+        deleted = 0
+        for paper in papers:
+            paper_id = paper["id"]
+            _repository().delete_paper(session_id, paper_id)
+            if paper.get("file_path"):
+                try:
+                    _storage().delete(paper["file_path"])
+                except Exception:  # storage cleanup must not block the reset
+                    pass
+            try:
+                _storage().delete_paper(paper_id)
+            except Exception:
+                pass
+            deleted += 1
+        return jsonify({"deleted": deleted})
     except RepositoryError as exc:
         return jsonify({"error": str(exc)}), 503
 

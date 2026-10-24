@@ -228,6 +228,41 @@
     });
   }
 
+  // Clear history: two-click confirm (works even where browser dialogs are blocked).
+  const clearHistoryButton = $('#clearHistoryButton');
+  if (clearHistoryButton) {
+    let armed = false;
+    let armTimer = null;
+    clearHistoryButton.addEventListener('click', async () => {
+      if (!armed) {
+        armed = true;
+        clearHistoryButton.textContent = 'Click again to confirm';
+        clearHistoryButton.classList.add('armed');
+        armTimer = window.setTimeout(() => {
+          armed = false;
+          clearHistoryButton.textContent = 'Clear all history';
+          clearHistoryButton.classList.remove('armed');
+        }, 5000);
+        return;
+      }
+      window.clearTimeout(armTimer);
+      armed = false;
+      clearHistoryButton.disabled = true;
+      clearHistoryButton.textContent = 'Clearing…';
+      try {
+        const payload = await api('/api/me/clear-history', { method: 'POST' });
+        showToast(`History cleared — ${payload.deleted} paper(s) removed.`);
+        setAlert(`History cleared. ${payload.deleted} paper(s) deleted.`, 'success');
+        window.setTimeout(() => window.location.reload(), 1200);
+      } catch (error) {
+        setAlert(error.message);
+        clearHistoryButton.disabled = false;
+        clearHistoryButton.textContent = 'Clear all history';
+        clearHistoryButton.classList.remove('armed');
+      }
+    });
+  }
+
   async function initialize() {
     try {
       const payload = await api('/api/me');
