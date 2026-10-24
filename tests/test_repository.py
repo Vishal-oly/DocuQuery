@@ -49,3 +49,50 @@ def test_local_repository_user_roundtrip(tmp_path):
             "id": "user-2", "name": "Aditi Two", "email": "aditi@example.com",
             "password_hash": "other-hash",
         })
+
+
+class _FakeTable:
+    def __init__(self, store, selected):
+        self.store = store
+        self.selected = selected
+        self._eq = []
+
+    def select(self, cols):
+        self.selected.append(cols)
+        return self
+
+    def eq(self, *a, **k):
+        return self
+
+    def order(self, *a, **k):
+        return self
+
+    def limit(self, *a, **k):
+        return self
+
+    def execute(self):
+        class R:
+            data = []
+        return R()
+
+
+class _FakeClient:
+    def __init__(self):
+        self.selected = []
+        self.storage = None
+
+    def table(self, name):
+        return _FakeTable(None, self.selected)
+
+
+def test_supabase_paper_selects_include_file_columns(tmp_path):
+    """Regression: file_path/file_size must be selected or View Document breaks."""
+    from docuquery.repository import Repository
+
+    client = _FakeClient()
+    repo = Repository({"LOCAL_DB_PATH": str(tmp_path / "repo.sqlite3")})
+    repo.client = client  # simulate Supabase mode without a real network client
+    repo.list_papers("00000000-0000-0000-0000-000000000000")
+    repo.get_paper("00000000-0000-0000-0000-000000000000", "11111111-1111-1111-1111-111111111111")
+    for cols in client.selected:
+        assert "file_path" in cols and "file_size" in cols, cols

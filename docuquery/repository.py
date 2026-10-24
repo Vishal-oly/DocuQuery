@@ -368,7 +368,7 @@ class Repository:
             if self.client:
                 result = (
                     self.client.table("papers")
-                    .select("id,session_id,title,filename,page_count,created_at,summary")
+                    .select("id,session_id,title,filename,page_count,created_at,summary,file_path,file_size")
                     .eq("session_id", session_id)
                     .order("created_at", desc=True)
                     .execute()
@@ -388,7 +388,7 @@ class Repository:
             if self.client:
                 result = (
                     self.client.table("papers")
-                    .select("id,session_id,title,filename,page_count,created_at,summary")
+                    .select("id,session_id,title,filename,page_count,created_at,summary,file_path,file_size")
                     .eq("id", paper_id)
                     .eq("session_id", session_id)
                     .limit(1)

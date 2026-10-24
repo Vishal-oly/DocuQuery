@@ -41,6 +41,12 @@ class Config:
         os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         or os.getenv("SUPABASE_KEY", "").strip()
     )
+    # Uploaded-PDF cloud copies (Supabase Storage). On ephemeral filesystems set
+    # SUPABASE_STORAGE_PRIMARY=true so files live in the bucket instead of disk.
+    SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "papers").strip()
+    SUPABASE_STORAGE_PRIMARY = (
+        os.getenv("SUPABASE_STORAGE_PRIMARY", "false").strip().lower() == "true"
+    )
 
     LOCAL_DB_PATH = os.getenv("LOCAL_DB_PATH", str(ROOT_DIR / "instance" / "demo.sqlite3"))
     EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "hashing").strip().lower()

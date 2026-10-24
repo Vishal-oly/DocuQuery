@@ -86,6 +86,34 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
 
 The service-role key is used only by the Flask server. It must never be added to browser JavaScript. The SQL enables row-level security and limits direct table access to the server-side service role.
 
+## Deploy (free)
+
+### Render.com — recommended (full features, 50 MB uploads)
+
+1. Push this repo to your GitHub account
+2. On [render.com](https://render.com) → **New → Blueprint** → connect the repo
+   (it reads `render.yaml` automatically)
+3. Fill the prompted secrets when asked:
+   - `SUPABASE_URL` — `https://<ref>.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Settings → API → service_role
+   - `GROQ_API_KEY` — console.groq.com → API Keys
+   - `GOOGLE_CLIENT_ID` — optional
+4. Deploy → your app gets a `https://docuquery.onrender.com` URL
+
+Uploads up to **50 MB** work (`MAX_UPLOAD_MB`), and PDFs are kept in
+**Supabase Storage** (`SUPABASE_STORAGE_PRIMARY=true`) so they survive restarts.
+
+### Fly.io / Docker
+
+A `Dockerfile` is included — `fly launch` or any Docker host works with the
+same environment variables.
+
+### Vercel — demo only (limited)
+
+Vercel serverless caps request bodies at **4.5 MB** and has an ephemeral
+filesystem, so big PDFs and "View Document" will not work. If you only need a
+small-PDF demo, wrap `run:app` with `@vercel/python` and set the same env vars.
+
 ## Optional: Google Sign-In
 
 The login page can show a **Continue with Google** button (one-tap sign-in). Google
