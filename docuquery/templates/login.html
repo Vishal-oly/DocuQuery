@@ -87,8 +87,8 @@
           New to DocuQuery? <a href="#" id="switchToRegister">Create an account</a>
         </p>
 
-        <div class="auth-divider"><span>or continue with</span></div>
         {% if google_client_id %}
+        <div class="auth-divider"><span>or continue with</span></div>
         <div class="google-signin-wrap">
           <div class="g_id_onload"
                data-client_id="{{ google_client_id }}"
@@ -96,13 +96,6 @@
                data-auto_prompt="false"></div>
           <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline"
                data-text="continue_with" data-shape="rectangular" data-logo_alignment="left"></div>
-        </div>
-        {% else %}
-        <div class="google-signin-wrap google-disabled" title="Google sign-in is not configured yet">
-          <button class="google-fake-btn" type="button" disabled>
-            <span class="google-g">G</span> Continue with Google
-          </button>
-          <p class="profile-hint">Enable karne ke liye <code>GOOGLE_CLIENT_ID</code> set karein — README me steps hain.</p>
         </div>
         {% endif %}
       </div>

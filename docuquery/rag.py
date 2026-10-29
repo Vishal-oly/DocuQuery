@@ -224,15 +224,15 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
             config.get("GROQ_MODEL", "openai/gpt-oss-20b"),
         )
         mode = "Groq RAG"
-    except LLMError:
+    except LLMError as exc:
         best = chunks[:2]
         excerpts = [
             f"“{_content(chunk)[:320]}” [p. {_page_number(chunk)}]"
             for chunk in best
         ]
         answer = (
-            "Groq is not configured or could not be reached, so here are the closest retrieved passages "
-            "instead of a generated answer: " + " ".join(excerpts)
+            f"{exc} Here are the closest retrieved passages instead of a generated answer: "
+            + " ".join(excerpts)
         )
         mode = "retrieval preview"
     return {"answer": answer, "mode": mode, "sources": sources}

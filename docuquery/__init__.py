@@ -26,10 +26,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(bp)
 
     @app.after_request
-    def allow_preview_iframes(response):
-        """Allow browser previews that embed the app in sandboxed iframes.
+    def allow_embedded_iframes(response):
+        """Allow the app to be embedded inside third-party iframes.
 
-        Sandboxed iframes run with an opaque origin ("null") and fetches from them
+        Embedded frames run with an opaque origin ("null") and fetches from them
         are treated as cross-origin; without CORS headers every API call is blocked.
         """
         origin = request.headers.get("Origin")

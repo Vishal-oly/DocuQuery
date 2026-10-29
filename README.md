@@ -134,8 +134,8 @@ GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
 5. Restart Flask. The button appears on `/login`. (No client secret needed — the app
    verifies Google ID tokens server-side.)
 
-> Note: inside sandboxed preview iframes Google's popup button may not open —
-> open the app in a normal browser tab (or on your laptop) to use Google sign-in.
+> Note: when the app is embedded in a third-party iframe, popup-based sign-in may
+> be blocked — open the app in a normal browser tab to use Google sign-in.
 
 ## Optional: MiniLM embeddings
 

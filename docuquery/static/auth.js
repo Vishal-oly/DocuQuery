@@ -328,7 +328,7 @@
   const initialMode = (window.DOCUQUERY_AUTH && window.DOCUQUERY_AUTH.mode) || 'login';
   setMode(initialMode);
 
-  // Buttons/Enter keys work even where native form submission is blocked (sandboxed iframes).
+  // Buttons/Enter keys work even where native form submission is blocked (embedded iframes).
   if (window.DQAuth && window.DQAuth.bindForm) {
     window.DQAuth.bindForm('#authForm', '#authSubmit', ['#nameInput', '#emailInput', '#passwordInput']);
   }

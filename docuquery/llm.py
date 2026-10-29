@@ -11,7 +11,9 @@ class LLMError(RuntimeError):
 
 def _call_groq(api_key: str, model: str, messages: list[dict[str, str]], max_tokens: int = 1400) -> str:
     if not api_key:
-        raise LLMError("GROQ_API_KEY is not set.")
+        raise LLMError(
+            "Groq API key is not configured — add GROQ_API_KEY to your .env file and restart."
+        )
     try:
         from groq import Groq
         client = Groq(api_key=api_key)
@@ -29,7 +31,28 @@ def _call_groq(api_key: str, model: str, messages: list[dict[str, str]], max_tok
         raise
     except Exception as exc:
         # Do not include secrets or request headers in user-facing errors.
-        raise LLMError(f"Groq request failed: {exc}") from exc
+        message = str(exc)
+        lowered = message.lower()
+        if "429" in message or "rate limit" in lowered or "too many requests" in lowered:
+            raise LLMError(
+                "Groq rate limit reached (free tier: 30 requests/minute) — wait a minute and try again."
+            ) from exc
+        if "401" in message or "unauthorized" in lowered or "invalid api key" in lowered or "api key" in lowered and "invalid" in lowered:
+            raise LLMError(
+                "Groq API key is invalid or revoked — check GROQ_API_KEY in your .env file."
+            ) from exc
+        if (
+            "connection" in lowered
+            or "timed out" in lowered
+            or "timeout" in lowered
+            or "name resolution" in lowered
+            or "failed to establish" in lowered
+            or "network" in lowered
+        ):
+            raise LLMError(
+                "Groq could not be reached — check your internet connection and try again."
+            ) from exc
+        raise LLMError(f"Groq request failed: {message}") from exc
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:

@@ -115,5 +115,7 @@ def test_google_button_hidden_when_not_configured(tmp_path):
     app = make_test_app(tmp_path, google_client_id="")
     client = app.test_client()
     page = client.get("/login").get_data(as_text=True)
+    # Nothing Google-related shows until a client id is configured.
     assert "accounts.google.com/gsi/client" not in page
-    assert "GOOGLE_CLIENT_ID" in page  # hint shown instead
+    assert "g_id_signin" not in page
+    assert "Continue with Google" not in page

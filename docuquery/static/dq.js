@@ -1,5 +1,5 @@
 /* DocuQuery auth-token helper.
-   Cookies are blocked in sandboxed/third-party iframe previews, so the app
+   Cookies can be blocked in embedded/third-party iframe contexts, so the app
    carries a signed auth token in localStorage and on internal links instead. */
 window.DQAuth = (() => {
   const STORAGE_KEY = 'docuquery_token';
@@ -67,7 +67,7 @@ window.DQAuth = (() => {
     const token = getToken();
     const headers = { ...(options.headers || {}) };
     if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`;
-    // Send the token in the URL too: some preview proxies strip the Authorization
+    // Send the token in the URL too: some embedded contexts strip the Authorization
     // header, and the server accepts either source.
     // Never hang forever — if the server dies mid-request, fail with a clear
     // message instead of leaving the UI stuck on a spinner.
@@ -86,9 +86,9 @@ window.DQAuth = (() => {
     }
   }
 
-  /* Bind a form so its button clicks and Enter keys work even in sandboxed
-     iframes, where the browser blocks native form submission (and never fires
-     the submit event) unless the sandbox has the 'allow-forms' permission. */
+  /* Bind a form so its button clicks and Enter keys work even when the app is
+     embedded in iframes that block native form submission (the submit event
+     never fires there) unless the iframe has the 'allow-forms' permission. */
   function bindForm(formSelector, buttonSelector, inputSelectors) {
     const form = document.querySelector(formSelector);
     const button = document.querySelector(buttonSelector);
