@@ -12,6 +12,33 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
+def _load_env_file(path=None) -> None:
+    """Load key=value lines from the project .env file into os.environ.
+
+    Runs as a fallback when python-dotenv is not installed, and only fills
+    variables that are not already set in the environment.
+    """
+    env_path = Path(path) if path else ROOT_DIR / ".env"
+    if not env_path.is_file():
+        return
+    try:
+        lines = env_path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name and name not in os.environ:
+            os.environ[name] = value
+
+
+_load_env_file()
+
+
 def _int_env(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
