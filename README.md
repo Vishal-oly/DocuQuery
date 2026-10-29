@@ -35,6 +35,9 @@ The app is a single-page workspace. The navigation links jump to Workspace, Uplo
 
 Python 3.10 or later is recommended.
 
+> **Windows shortcut:** double-click `start.bat` (or run it in a terminal) — it
+> handles steps 1–3 in one go.
+
 ### 1. Create an environment and install dependencies
 
 ```bash

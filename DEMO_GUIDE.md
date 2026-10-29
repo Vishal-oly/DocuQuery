@@ -6,6 +6,11 @@ Setup instructions and a short demo walkthrough.
 
 ## Quick Start
 
+**Windows (easiest):** double-click `start.bat` — or run `start.bat` in a
+terminal. It creates the environment (first run), installs dependencies and
+starts the server.
+
+**Manual setup:**
 ```bash
 # 1. Open the project folder
 cd DocuQuery
