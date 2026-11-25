@@ -27,8 +27,10 @@ from werkzeug.utils import secure_filename
 
 from .embeddings import EmbeddingError
 from .llm import model_status
+from .ocr import available as ocr_available
 from .pdf_processing import PDFProcessingError, parse_pdf_bytes
 from .rag import answer_question, make_summary
+from .tables import tables_available
 from .repository import RepositoryError, UserExistsError
 
 bp = Blueprint("main", __name__)
@@ -407,6 +409,8 @@ def health():
             "llm_model": model["model"],
             "llm_backend": model["backend"],
             "llm_label": model["label"],
+            "ocr_available": ocr_available(),
+            "tables_available": tables_available(),
             "embedding_backend": config.get("EMBEDDING_BACKEND"),
             "max_upload_mb": max(1, int(config.get("MAX_CONTENT_LENGTH", 20 * 1024 * 1024) / (1024 * 1024))),
         }
@@ -548,6 +552,8 @@ def upload_pdf():
                 "chunk_count": len(chunk_rows),
                 "database": repository.mode,
                 "text_char_count": parsed["text_char_count"],
+                "table_chunks": parsed.get("table_chunks", 0),
+                "ocr_pages": parsed.get("ocr_pages", 0),
             }
         ), 201
     except PDFProcessingError as exc:

@@ -195,8 +195,14 @@ def model_status(config: dict[str, Any]) -> dict[str, Any]:
         return {"available": resolved is not None, "backend": "openai",
                 "label": "Local model", "model": model, "base_url": base}
     model = config.get("OLLAMA_MODEL", DEFAULT_MODEL)
-    return {"available": ollama_available(config), "backend": "ollama",
-            "label": "Ollama", "model": model}
+    running = ollama_available(config)
+    if running:
+        return {"available": True, "backend": "ollama",
+                "label": "Local model (llama.cpp)", "model": model}
+    # Nothing is serving yet: report the managed preset the user picked, not an Ollama tag.
+    preferred = "Qwen2.5 1.5B Instruct (not loaded)"
+    return {"available": False, "backend": "ollama",
+            "label": "Model not loaded", "model": preferred}
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:

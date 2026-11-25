@@ -455,3 +455,13 @@ body { font-size: 15px; }
 .landing-privacy-note {
   margin: 22px 0 0; color: var(--muted); font-size: 12.5px; text-align: center;
 }
+
+/* Honest status banner: shown only when something optional is unavailable. */
+.model-notice {
+  display: flex; align-items: flex-start; gap: 9px; margin: 12px 0 0;
+  padding: 10px 13px; border-radius: 10px; font-size: 12px; line-height: 1.5;
+  background: #fff8e8; border: 1px solid #f3e2bd; color: #7a6023;
+}
+.model-notice-icon { font-size: 13px; line-height: 1.4; }
+.model-notice code { background: #fdf1d8; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+.model-notice strong { color: #6a5319; }

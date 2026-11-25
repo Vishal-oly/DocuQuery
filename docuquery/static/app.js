@@ -134,6 +134,41 @@
     context.append(textElement('span', '', title));
   }
 
+  let chatLog = [];
+  let restoringChat = false;
+
+  function chatStorageKey() {
+    return activePaper ? `dqChat:${activePaper.id}` : '';
+  }
+
+  function persistChat() {
+    if (restoringChat) return;
+    const key = chatStorageKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(chatLog.slice(-40)));
+    } catch (error) { /* storage may be full or blocked */ }
+  }
+
+  function restoreChat(paper) {
+    chatLog = [];
+    chatMessages.replaceChildren();
+    if (assistantWelcome) chatMessages.append(assistantWelcome);
+    if (!paper) return;
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(`dqChat:${paper.id}`) || 'null');
+    } catch (error) { saved = null; }
+    if (!Array.isArray(saved) || !saved.length) return;
+    restoringChat = true;
+    saved.forEach((entry) => {
+      chatLog.push(entry);
+      addMessage(entry.role, entry.text, entry.sources || [], entry.mode || '');
+    });
+    restoringChat = false;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
   function addMessage(role, text, sources = [], mode = '') {
     if (assistantWelcome && assistantWelcome.isConnected) assistantWelcome.remove();    const message = document.createElement('div');
     message.className = `chat-message ${role}`;
@@ -143,8 +178,20 @@
       sourceRow.className = 'chat-message-meta';
       sourceRow.append(textElement('span', 'meta-label', 'Evidence:'));
       const pages = [...new Set(sources.map((source) => source.page_number || 1))].slice(0, 4);
+      const token = window.DQAuth ? window.DQAuth.getToken() : '';
       pages.forEach((page) => {
-        sourceRow.append(textElement('span', 'chat-source-mini', `p. ${page}`));
+        if (activePaper && token) {
+          const link = document.createElement('a');
+          link.className = 'chat-source-mini';
+          link.href = `/api/papers/${encodeURIComponent(activePaper.id)}/file?token=${encodeURIComponent(token)}#page=${page}`;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.title = `Open page ${page} in the PDF`;
+          link.textContent = `p. ${page}`;
+          sourceRow.append(link);
+        } else {
+          sourceRow.append(textElement('span', 'chat-source-mini', `p. ${page}`));
+        }
       });
       message.append(sourceRow);
     } else if (role === 'assistant' && mode) {
@@ -152,6 +199,10 @@
     }
     chatMessages.append(message);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (!restoringChat) {
+      chatLog.push({ role, text, sources, mode });
+      persistChat();
+    }
     return message;
   }
 
@@ -168,6 +219,7 @@
     $('#paperChunkCount').textContent = chunkCount || '—';
     renderSummary(paper.summary || {});
     updateChatContext(paper);
+    restoreChat(paper);
     chatInput.disabled = false;
     sendButton.disabled = false;
     document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => { button.disabled = false; });
@@ -261,7 +313,11 @@
       chatMessages.replaceChildren();
       setPaper(payload.paper, payload.chunk_count);
       const mode = payload.summary && payload.summary.mode ? payload.summary.mode : 'processed';
-      setAlert(`Ready: ${payload.paper.title} · ${payload.chunk_count} passages indexed · ${mode}.`, 'success');
+      const extras = [];
+      if (payload.table_chunks) extras.push(`${payload.table_chunks} table${payload.table_chunks === 1 ? '' : 's'}`);
+      if (payload.ocr_pages) extras.push(`${payload.ocr_pages} OCR page${payload.ocr_pages === 1 ? '' : 's'}`);
+      const extraText = extras.length ? ` · ${extras.join(' · ')}` : '';
+      setAlert(`Ready: ${payload.paper.title} · ${payload.chunk_count} passages indexed${extraText} · ${mode}.`, 'success');
       $('#footerStatus').textContent = `${payload.chunk_count} passages indexed`;
       showToast('Research brief is ready.');
       resultsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -364,6 +420,10 @@
       chatEpoch += 1;
       $('#typingIndicator')?.remove();
       chatMessages.replaceChildren();
+      chatLog = [];
+      if (activePaper) {
+        try { localStorage.removeItem(`dqChat:${activePaper.id}`); } catch (error) { /* ignore */ }
+      }
       if (assistantWelcome) chatMessages.append(assistantWelcome);
       document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => {
         button.disabled = !activePaper;
@@ -432,6 +492,20 @@
       $('#footerStatus').textContent = health.llm_available
         ? `${health.llm_label || 'Local model'} ready · ${health.llm_model || 'default model'}`
         : 'Preview mode · no local model is running';
+      const notice = $('#modelNotice');
+      const noticeText = $('#modelNoticeText');
+      if (notice && noticeText && !health.llm_available) {
+        const missing = [];
+        if (health.ocr_available === false) missing.push('OCR add-on');
+        if (health.tables_available === false) missing.push('table reader');
+        noticeText.innerHTML = '<strong>Local model is not running yet.</strong> '
+          + 'Answers will be exact quotes from the PDF instead of written text. '
+          + 'Start it with <code>start.bat</code> (or <code>python local_ai.py</code>).'
+          + (missing.length ? ` Optional extras not installed: ${missing.join(', ')}.` : '');
+        notice.hidden = false;
+      } else if (notice) {
+        notice.hidden = true;
+      }
       await loadLibrary();
     } catch (error) {
       $('#connectionPill').dataset.mode = 'offline';

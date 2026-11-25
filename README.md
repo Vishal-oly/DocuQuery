@@ -62,6 +62,15 @@ It adds `pypdfium2` (page rendering), `rapidocr-onnxruntime` (ONNX OCR, models b
 offline. Pages without a text layer are recognised automatically; `OCR_MAX_PAGES`
 (default 20) and `OCR_ENABLED=false` control it. OCR is slower than text extraction.
 
+### Workspace behaviour
+
+- **Page chips are links** — clicking `p. 173` under an answer opens the stored PDF at that page.
+- **Chat survives a refresh** — each paper's thread is kept in the browser (`localStorage`,
+  last 40 messages); "Clear chat" wipes it.
+- **Honest status banner** — if the local model is not running, the workspace says so and warns
+  that answers will be quoted passages instead of written text.
+- **Upload summary line** reports what was indexed: passages, tables found, OCR pages read.
+
 ### Other languages
 
 You can ask in Hindi, Spanish, French, German, Italian, Chinese and more. Two things happen:

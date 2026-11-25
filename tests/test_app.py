@@ -160,3 +160,13 @@ def test_model_picker_lists_and_saves_choice(tmp_path, monkeypatch):
     assert client.get("/api/models").get_json()["selected_id"] == "preset:small"
 
     assert client.post("/api/models/select", json={"id": "preset:huge"}).status_code == 400
+
+
+def test_health_reports_optional_features(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "ocr_available" in payload
+    assert "tables_available" in payload
+    assert payload["llm_label"] in {"Local model (llama.cpp)", "Model not loaded", "Local model"}
