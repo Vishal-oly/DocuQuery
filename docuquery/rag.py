@@ -108,6 +108,34 @@ def _spread_chunks(repository, session_id: str, paper_id: str, limit: int = 8) -
     return [{**chunk, "similarity": float(chunk.get("similarity") or 0.0)} for chunk in picked]
 
 
+def _excerpt(chunk: dict[str, Any], limit: int = 300) -> str:
+    """One clean quote: no stray page numbers, no half sentences."""
+    text = re.sub(r"\s+", " ", _content(chunk)).strip()
+    text = re.sub(r"^\d{1,3}\s+", "", text)
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("? "), cut.rfind("! "))
+    if end > 100:
+        return cut[: end + 1]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > 100 else cut).rstrip(",;:") + "…"
+
+
+def _fallback_answer(error: Exception, chunks: list[dict[str, Any]]) -> str:
+    quotes = [
+        f"• p. {_page_number(chunk)} — “{_excerpt(chunk)}”"
+        for chunk in chunks[:3]
+    ]
+    return (
+        "The local model is not running, so here are the exact passages from your paper "
+        "instead of a written answer:\n\n"
+        + "\n\n".join(quotes)
+        + "\n\nStart it with start.bat (or python local_ai.py) and ask again for a written, "
+        "page-cited answer."
+    )
+
+
 def _page_number(chunk: dict[str, Any]) -> int:
     return int(chunk.get("page_number") or chunk.get("page") or 1)
 
@@ -358,14 +386,6 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
             mode = "Local model RAG"
         answer = sanitize_answer(answer)
     except LLMError as exc:
-        best = chunks[:2]
-        excerpts = [
-            f"“{_content(chunk)[:320]}” [p. {_page_number(chunk)}]"
-            for chunk in best
-        ]
-        answer = sanitize_answer(
-            f"{exc} Here are the closest retrieved passages instead of a generated answer: "
-            + " ".join(excerpts)
-        )
-        mode = "retrieval preview"
+        answer = sanitize_answer(_fallback_answer(exc, chunks))
+        mode = "Retrieval preview — model offline"
     return {"answer": answer, "mode": mode, "sources": sources}

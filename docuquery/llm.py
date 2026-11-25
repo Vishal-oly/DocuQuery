@@ -51,7 +51,7 @@ def ollama_available(config: dict[str, Any]) -> bool:
 def _call_ollama(config: dict[str, Any], messages: list[dict[str, str]],
                  max_tokens: int, *, structured: bool = False) -> str:
     if not config.get("OLLAMA_ENABLED", True):
-        raise LLMError("Local model is disabled (OLLAMA_ENABLED=false).")
+        raise LLMError("The local model is switched off.")
     model = config.get("OLLAMA_MODEL", DEFAULT_MODEL)
     payload = {
         "model": model, "messages": messages, "stream": False,
@@ -71,8 +71,8 @@ def _call_ollama(config: dict[str, Any], messages: list[dict[str, str]],
         raise LLMError(f"Ollama rejected the request (HTTP {exc.code}).") from exc
     except (URLError, TimeoutError, OSError) as exc:
         raise LLMError(
-            "No local model answered. Start DocuQuery with start.bat so it can run its own "
-            "model server, or start Ollama."
+            "The local model is not running. Start DocuQuery with start.bat "
+            "(or run python local_ai.py) so it can load its own model."
         ) from exc
     except (ValueError, KeyError, TypeError) as exc:
         raise LLMError("Ollama returned an invalid response.") from exc

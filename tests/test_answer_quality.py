@@ -99,3 +99,26 @@ def test_answer_question_adds_intro_chunks_for_broad_questions(monkeypatch):
 class _FakeEmbedder:
     def embed(self, texts):
         return [[0.1, 0.2, 0.3] for _ in texts]
+
+
+def test_fallback_answer_is_clean_and_actionable():
+    from docuquery.llm import LLMError
+
+    text = rag._fallback_answer(
+        LLMError("The local model is not running."),
+        [
+            {"page_number": 2, "content": "2\nOpening remarks  These lecture notes are based on 3 courses in quantum mechanics."},
+            {"page_number": 182, "content": "complete Bloch oscillations with frequency omega and the double well system."},
+        ],
+    )
+    assert "OLLAMA" not in text
+    assert "• p. 2 — “Opening remarks" in text
+    assert "start.bat" in text
+
+
+def test_excerpt_trims_at_sentence_boundary_and_drops_stray_page_number():
+    long_text = "9 " + ("Alpha beta gamma. " * 40)
+    excerpt = rag._excerpt({"content": long_text}, limit=120)
+    assert not excerpt.startswith("9 ")
+    assert excerpt.endswith(".")
+    assert len(excerpt) <= 130
