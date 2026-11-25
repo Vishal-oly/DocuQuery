@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -349,15 +350,71 @@ def check_url(url: str) -> str:
     return text
 
 
+NOT_GGUF_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".onnx", ".h5", ".msgpack", ".pkl")
+
+
+def huggingface_token() -> str:
+    """Optional read token, so gated GGUF repositories can be downloaded too."""
+    for name in ("HF_TOKEN", "HUGGINGFACE_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def reject_original_format(url: str) -> None:
+    """Say plainly that safetensors/ONNX files are not usable by a CPU GGUF runner."""
+    path = unquote(urlparse(url).path).lower()
+    if path.endswith(NOT_GGUF_SUFFIXES):
+        raise ValueError(
+            "That is the original PyTorch/SafeTensors file, not a GGUF. DocuQuery needs a GGUF "
+            "build of the same model — open the model page, look for a GGUF version "
+            "(bartowski or lmstudio-community publish them) and copy the .gguf link from there."
+        )
+
+
+def gated_message(url: str) -> str:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    parts = parsed.path.strip("/").split("/")
+    if (host.endswith("huggingface.co") or host.endswith("hf.co")) and len(parts) >= 2:
+        repo = f"{parts[0]}/{parts[1]} is a gated model — "
+    else:
+        repo = "This link needs a signed-in licence acceptance — "
+    return (
+        f"{repo}Hugging Face asks for it before the file can be downloaded. "
+        "Accept the licence on the model page, put HF_TOKEN=your_read_token in .env, then try "
+        "again. A public GGUF version of the same model works without a token."
+    )
+
+
 def download_custom(url: str, opener=None, min_mb: int = MIN_CUSTOM_MB) -> Path:
     """Save any GGUF a person links to, straight into the models folder."""
     url = check_url(url)
+    reject_original_format(url)
     destination_dir = models_dir()
     destination_dir.mkdir(parents=True, exist_ok=True)
     open_url = opener or urllib.request.urlopen
-    request = urllib.request.Request(url, headers={"User-Agent": "DocuQuery/offline"})
+    host = (urlparse(url).hostname or "").lower()
+    headers = {"User-Agent": "DocuQuery/offline"}
+    token = huggingface_token()
+    if token and (host.endswith("huggingface.co") or host.endswith("hf.co")):
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
     try:
         response = open_url(request, timeout=60)
+    except urllib.error.HTTPError as exc:
+        LOGGER.debug("Custom model link returned HTTP %s", exc.code)
+        if exc.code in (401, 403):
+            raise OSError(gated_message(url)) from exc
+        if exc.code == 404:
+            raise OSError(
+                "That link was not found (404). Copy the link again from the model's Files tab."
+            ) from exc
+        raise OSError(
+            "Hugging Face refused the download. Check the link, or accept the model's licence "
+            "on its page first."
+        ) from exc
     except Exception as exc:
         LOGGER.debug("Custom model link failed: %s", exc)
         raise OSError(
@@ -389,8 +446,9 @@ def download_custom(url: str, opener=None, min_mb: int = MIN_CUSTOM_MB) -> Path:
                         first = False
                         if not chunk.startswith(b"GGUF"):
                             raise OSError(
-                                "That link is not a GGUF model file — open the model's "
-                                "Files tab on Hugging Face and copy the .gguf download link."
+                                "That link did not return a GGUF file. Open the model's "
+                                "Files tab and copy the link of a .gguf file (a GGUF version "
+                                "of the model, not the original SafeTensors weights)."
                             )
                     handle.write(chunk)
                     received += len(chunk)
@@ -410,6 +468,7 @@ def download_custom(url: str, opener=None, min_mb: int = MIN_CUSTOM_MB) -> Path:
 def start_custom_download(url: str) -> dict[str, object]:
     """Download a linked GGUF in the background and make it the selected model."""
     check_url(url)
+    reject_original_format(url)
     with _DOWNLOAD_LOCK:
         if _DOWNLOAD["state"] == "downloading":
             raise ValueError("A model is already downloading — wait for it to finish.")

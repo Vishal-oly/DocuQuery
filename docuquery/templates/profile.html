@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#f7f8fc">
   <title>Profile — DocuQuery</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=32) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=32) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=33) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=33) }}" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -125,6 +125,8 @@
           <p class="profile-hint" id="modelLinkNote">
             On Hugging Face open the model → <strong>Files</strong> → click the <code>.gguf</code> size → then
             <strong>Download</strong> and copy that link. It is saved in the folder above and becomes your selected model.
+            Gated models (Gemma, Llama): accept the licence on the model page and put
+            <code>HF_TOKEN</code> in <code>.env</code> first.
           </p>
         </form>
       </section>
@@ -160,7 +162,7 @@
   </main>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='dq.js', v=32) }}" defer></script>
-  <script src="{{ url_for('static', filename='profile.js', v=32) }}" defer></script>
+  <script src="{{ url_for('static', filename='dq.js', v=33) }}" defer></script>
+  <script src="{{ url_for('static', filename='profile.js', v=33) }}" defer></script>
 </body>
 </html>

@@ -66,6 +66,46 @@ The application can download any model that is published as a `.gguf` file.
 7. Progress appears beneath the field: `Downloading the model — 12% of 4680 MB`.
 8. On completion the model is saved in `models\`, selected, and started automatically.
 
+### Gated models (Gemma, Llama and similar)
+
+Some repositories — `google/gemma-2-2b` is one — are **gated** and, in any case, publish the
+original PyTorch/SafeTensors weights, which a CPU GGUF runner cannot use. Two conditions must
+be met before such a model can be used:
+
+1. **It must be a GGUF build.** Search Hugging Face for `<model> GGUF`
+   (`bartowski/gemma-2-2b-it-GGUF`, `lmstudio-community/gemma-2-2b-it-GGUF`) and copy the
+   link of the `.gguf` file, not the link of the model page.
+2. **The licence must be accepted.** Open the model page while signed in to Hugging Face and
+   press **Acknowledge licence**. Then create a read token at
+   <https://huggingface.co/settings/tokens>, add it to `.env` and restart DocuQuery:
+
+   ```ini
+   HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx
+   ```
+
+   The token is sent only to `huggingface.co`; it is never attached to other sites.
+   Public GGUF repositories (bartowski, lmstudio-community, TheBloke) need no token at all.
+
+Use the instruction-tuned variant (`-it`) for question answering; the base model is not
+trained to follow instructions and answers poorly.
+
+If a gated link is pasted without a token, DocuQuery reports:
+*"… is a gated model — Hugging Face needs a signed-in licence acceptance…"*, so the failure is
+never silent.
+
+### Downloading through LM Studio instead
+
+LM Studio is optional, but it is a convenient downloader:
+
+1. In LM Studio open the **Discover** (search) tab and search for the model, for example
+   `gemma-2-2b-it`.
+2. Choose a **GGUF** result with `Q4_K_M` in its name and press **Download**.
+3. For gated repositories, sign in inside LM Studio (Settings → account/token) so it can send
+   your Hugging Face token; LM Studio then downloads the gated files for you.
+4. Start DocuQuery and open **Profile → AI model**. The model appears automatically under
+   **"GGUF files on this laptop"** — DocuQuery reads LM Studio's own library, so there is
+   nothing to copy and nothing to download twice.
+
 | Quantisation | Size (7B model) | When to use |
 |---|---|---|
 | `Q4_K_M` | ~4.5 GB | standard choice |

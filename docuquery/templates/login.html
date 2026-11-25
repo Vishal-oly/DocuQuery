@@ -7,8 +7,8 @@
   <meta name="description" content="Sign in to DocuQuery or create a free account to save your scientific-paper research workspace.">
   <title>Login — DocuQuery</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=32) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=32) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=33) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=33) }}" rel="stylesheet">
 </head>
 <body class="auth-body">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -103,7 +103,7 @@
       mode: {{ (mode or 'login')|tojson }}
     };
   </script>
-    <script src="{{ url_for('static', filename='dq.js', v=32) }}" defer></script>
-  <script src="{{ url_for('static', filename='auth.js', v=32) }}" defer></script>
+    <script src="{{ url_for('static', filename='dq.js', v=33) }}" defer></script>
+  <script src="{{ url_for('static', filename='auth.js', v=33) }}" defer></script>
 </body>
 </html>

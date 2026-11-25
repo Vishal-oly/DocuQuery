@@ -83,6 +83,16 @@ model explicitly (`--model`, `--model-path`, `LOCAL_AI_PRESET`), and the supervi
 - with no model on disk the workspace shows "No model downloaded yet … Profile → AI model",
   the chip reads `no model yet · Profile`, and no `start.bat` directions remain in the UI.
 
+### Gated and non-GGUF links
+
+- A 401/403 from the host now reads *"google/gemma-2-2b is a gated model — … put HF_TOKEN=…"*
+  instead of a generic connection error (checked against a local server that returns 401);
+- 404 reads *"That link was not found (404)"*;
+- a `.safetensors` or `.bin` link is refused with HTTP 400 before any download starts, because
+  DocuQuery needs a GGUF build;
+- `HF_TOKEN` (or `HUGGINGFACE_TOKEN` / `HUGGING_FACE_HUB_TOKEN`) is attached as a Bearer header
+  **only** when the host is `huggingface.co` / `hf.co`, proven by inspecting the outgoing request.
+
 ## 3. Browser-level checks (real page, real JS)
 
 The workspace, summaries, profile, landing, login and forgot pages were loaded in a

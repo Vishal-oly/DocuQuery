@@ -227,7 +227,7 @@ def test_link_download_rejects_html_and_missing_scheme(tmp_path, monkeypatch):
             "https://example.test/page.gguf",
             opener=lambda request, timeout=60: _HeaderResponse(b"<html>not a model</html>"),
         )
-    assert "not a GGUF model file" in str(html_error.value)
+    assert "did not return a GGUF file" in str(html_error.value)
     assert not list(tmp_path.glob("*.gguf")), "a rejected download must leave nothing behind"
 
     for bad in ("ftp://example.test/m.gguf", "file:///etc/passwd", "example.test/m.gguf", ""):
@@ -253,3 +253,74 @@ def test_describe_reports_folder_and_free_space(tmp_path, monkeypatch):
     info = model_registry.describe({"OLLAMA_ENABLED": False, "LLM_BACKEND": "ollama"})
     assert info["models_dir"] == str(tmp_path / "models")
     assert info["free_space_mb"] > 0
+
+
+def _raise_http(code: int):
+    import urllib.error
+
+    def opener(request, timeout=60):
+        raise urllib.error.HTTPError("https://huggingface.co/x/y", code, "err", {}, None)
+
+    return opener
+
+
+def test_gated_model_link_gets_a_licence_message(tmp_path, monkeypatch):
+    """google/gemma-2-2b style links need a licence acceptance and a token."""
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    with pytest.raises(OSError) as error:
+        model_registry.download_custom(
+            "https://huggingface.co/google/gemma-2-2b/resolve/main/model.gguf",
+            opener=_raise_http(401),
+        )
+    text = str(error.value)
+    assert "gated" in text and "HF_TOKEN" in text
+    assert not list(tmp_path.glob("*.gguf"))
+
+
+def test_missing_link_and_other_failures_are_explained(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    with pytest.raises(OSError) as not_found:
+        model_registry.download_custom("https://example.test/m.gguf", opener=_raise_http(404))
+    assert "404" in str(not_found.value)
+
+
+def test_original_safetensors_link_is_refused_before_downloading(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    for url in (
+        "https://huggingface.co/google/gemma-2-2b/resolve/main/model.safetensors",
+        "https://huggingface.co/x/y/resolve/main/pytorch_model.bin",
+    ):
+        with pytest.raises(ValueError) as error:
+            model_registry.download_custom(url, opener=lambda request, timeout=60: None)
+        assert "GGUF" in str(error.value)
+    with pytest.raises(ValueError):
+        model_registry.start_custom_download(
+            "https://huggingface.co/google/gemma-2-2b/resolve/main/model.safetensors"
+        )
+
+
+def test_hf_token_is_sent_only_to_huggingface(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    monkeypatch.setenv("HF_TOKEN", "hf_test_token")
+    seen: list[dict[str, str]] = []
+
+    def opener(request, timeout=60):
+        seen.append({key.lower(): value for key, value in request.header_items()})
+        return _HeaderResponse(b"GGUF" + b"\0" * (1024 * 1024))
+
+    model_registry.download_custom(
+        "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf",
+        opener=opener,
+    )
+    model_registry.download_custom("https://example.test/other.gguf", opener=opener)
+    assert seen[0].get("authorization") == "Bearer hf_test_token"
+    assert "authorization" not in seen[1]
