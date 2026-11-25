@@ -252,3 +252,14 @@ def test_upload_accepts_non_latin_filename_and_rejects_fake_pdf(tmp_path):
     )
     assert fake.status_code == 400
     assert "does not look like a PDF" in fake.get_json()["error"]
+
+
+def test_workspace_uses_dynamic_paper_specific_suggestions(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client)
+    page = client.get("/workspace").get_data(as_text=True)
+    assert 'id="suggestionList"' in page
+    assert 'id="suggestionActions"' in page
+    # The old one-word static chips are gone; only the three quick actions remain.
+    assert 'data-question="What is the main objective of this paper?"' not in page
+    assert page.count('class="suggestion-chip"') == 3

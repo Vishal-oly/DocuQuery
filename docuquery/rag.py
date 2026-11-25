@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections import Counter
 from typing import Any
 
 from .llm import (
@@ -10,6 +11,7 @@ from .llm import (
     generate_questions,
     generate_structured_summary,
     looks_non_english,
+    suggest_questions as llm_suggest_questions,
     translate_query,
 )
 
@@ -365,6 +367,98 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
     summary["notice"] = notice
     sources = citation_sources(chunks)
     return summary, sources
+
+
+_GENERIC_TERMS = {
+    "figure", "figures", "table", "tables", "paper", "study", "studies", "results",
+    "result", "however", "therefore", "different", "proposed", "using", "based",
+    "between", "within", "which", "these", "those", "their", "there", "would",
+    "could", "should", "about", "where", "while", "shows", "shown", "given",
+    "obtained", "respectively", "approach", "method", "model", "models", "review",
+    "research", "scientific", "article", "authors", "section", "value", "values",
+    "synthetic", "example", "examples", "evidence", "provide", "provided", "generated",
+    "various", "several", "because", "without",
+    "through", "following", "including", "according", "available", "possible",
+}
+
+
+def _fallback_questions(chunks: list[dict[str, Any]], paper: dict[str, Any], limit: int = 8) -> list[str]:
+    """Paper-specific questions without a model, so the chips are never empty."""
+    text = " ".join(_content(chunk) for chunk in chunks)
+    questions: list[str] = []
+    title = str(paper.get("title") or "").strip()
+    if len(title) > 12 and not title.lower().startswith("untitled"):
+        short_title = title if len(title) <= 90 else title[:87].rstrip(" ,.;:") + "…"
+        questions.append(f'What problem does “{short_title}” solve?')
+
+    sections: list[str] = []
+    for chunk in chunks:
+        name = _section(chunk).strip()
+        if name and name.lower() not in {"paper excerpt", "unknown"} and name not in sections:
+            sections.append(name)
+    for name in sections[:2]:
+        questions.append(f"What does the paper report in its {name} section?")
+
+    metric_names = "accuracy|f1|precision|recall|rouge|bleu|map|auc|score"
+    metric = re.search(
+        rf"\b({metric_names})\b[^.]{{0,40}}?\d{{1,3}}(?:\.\d+)?\s?%",
+        text,
+        re.IGNORECASE,
+    ) or re.search(
+        rf"\d{{1,3}}(?:\.\d+)?\s?%\s+(?:of\s+)?({metric_names})\b",
+        text,
+        re.IGNORECASE,
+    )
+    if metric:
+        questions.append(f"What {metric.group(1).lower()} does the paper report?")
+
+    if re.search(r"\bdataset|corpus|benchmark|participants|samples?\b", text, re.IGNORECASE):
+        questions.append("Which dataset or benchmark is used, and how large is it?")
+
+    used_terms = set(_GENERIC_TERMS)
+    used_terms.update({"dataset", "datasets", "benchmark", "accuracy", "limitation", "limitations"})
+    for name in sections:
+        used_terms.update(word.lower() for word in re.findall(r"[A-Za-z]{4,}", name))
+    words = Counter(
+        word.lower()
+        for word in re.findall(r"[A-Za-z][A-Za-z\-]{5,}", text)
+        if word.lower() not in used_terms
+    )
+    for word, count in words.most_common(8):
+        if len(questions) >= limit:
+            break
+        if count < 2:
+            continue
+        questions.append(f"What does the paper say about {word}?")
+
+    if re.search(r"\blimitation|future work|drawback|shortcoming\b", text, re.IGNORECASE):
+        questions.append("What limitations do the authors admit?")
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for question in questions:
+        key = question.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(question)
+        if len(unique) >= limit:
+            break
+    return unique
+
+
+def suggest_questions(repository, embedder, config: dict[str, Any], session_id: str,
+                      paper: dict[str, Any], count: int = 8) -> list[str]:
+    """Pick questions worth asking about this paper, model first, heuristics second."""
+    chunks = _spread_chunks(repository, session_id, paper["id"], limit=7)
+    if not chunks:
+        return []
+    context = format_context(chunks, paper.get("filename", "paper.pdf"), 9000)
+    try:
+        return llm_suggest_questions(context, config, count=count)
+    except LLMError as exc:
+        LOGGER.debug("Falling back to heuristic question suggestions: %s", exc)
+        return _fallback_questions(chunks, paper, limit=count)
 
 
 def answer_question(repository, embedder, config: dict[str, Any], session_id: str, paper: dict[str, Any], question: str, detail: str | None = None) -> dict[str, Any]:

@@ -375,6 +375,73 @@ Paper passages:
     )
 
 
+def _parse_question_list(text: str, count: int) -> list[str]:
+    """Pull a clean list of questions out of whatever the model wrote."""
+    cleaned = (text or "").strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    candidates: list[str] = []
+    match = re.search(r"\[[\s\S]*\]", cleaned)
+    if match:
+        try:
+            value = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            value = None
+        if isinstance(value, list):
+            candidates = [str(item) for item in value]
+    if not candidates:
+        for line in cleaned.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            line = re.sub(r"^\s*(?:[-*•]|\d{1,2}[.)])\s*", "", line)
+            line = line.strip().strip('"').strip("'").strip()
+            if line:
+                candidates.append(line)
+    questions: list[str] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        question = re.sub(r"\s+", " ", str(raw)).strip().strip('"').strip()
+        question = re.sub(r"\s*\[(?:p\.?\s*)?\d+\s*\]$", "", question).strip()
+        if not question.endswith("?"):
+            question = question.rstrip(".") + "?"
+        if len(question) < 12 or len(question) > 160:
+            continue
+        key = question.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        questions.append(question)
+        if len(questions) >= count:
+            break
+    if not questions:
+        raise LLMError("The model did not return usable questions.")
+    return questions
+
+
+def suggest_questions(context: str, config: dict[str, Any], count: int = 8) -> list[str]:
+    """Ask the local model what a reader should ask about *this* paper."""
+    system = (
+        "You help a reader explore one specific scientific paper. Write questions that the "
+        "supplied passages can actually answer. Each question must mention something concrete "
+        "from the passages: a dataset, a metric, a model name, a method, a number or a result. "
+        "Never write generic questions like 'What is the objective?'. "
+        "No numbering, no answers, no page markers, no Markdown."
+    )
+    user = f"""Write exactly {count} short questions a reader might ask about this paper.
+Return ONLY a JSON array of strings, for example:
+["How does the model handle long documents?", "What accuracy does the method reach on SQuAD?"]
+
+Paper passages:
+{context}"""
+    text = _chat(
+        config,
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        max_tokens=int(config.get("SUGGESTION_MAX_TOKENS") or 420),
+    )
+    return _parse_question_list(text, count)
+
+
 def answer_from_context(question: str, context: str, config: dict[str, Any],
                         detail: str | None = None) -> str:
     style = answer_detail(config, detail)

@@ -2,6 +2,11 @@
 
 Upload a text-based research PDF, generate a structured brief, and ask questions with page references. Everything runs on your computer: Flask, PDF extraction, hashing embeddings, SQLite, and a small local language model. No API key, no account on any website, no cloud database.
 
+The chat card also picks **paper-specific questions** for you: the local model reads the
+uploaded paper and writes the questions into *Try asking*, and each one disappears once
+you have asked it. With the model switched off the app falls back to questions built from
+the paper's title, sections and key terms.
+
 ## One-time setup
 
 1. Install Python 3.10+ (on Windows tick **"Add python.exe to PATH"**).

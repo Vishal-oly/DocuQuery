@@ -599,6 +599,70 @@ def upload_pdf():
         ), 500
 
 
+def _normalise_question(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+@bp.get("/api/papers/<paper_id>/suggestions")
+@api_login_required
+def paper_suggestions(paper_id: str):
+    """Questions worth asking about this paper; the model writes them for one paper."""
+    from .rag import suggest_questions
+
+    session_id = _session_id()
+    try:
+        repository = _repository()
+        paper = repository.get_paper(session_id, paper_id)
+        if not paper:
+            return jsonify({"error": "Paper not found in this account."}), 404
+        summary = dict(paper.get("summary") or {})
+        asked = [_normalise_question(item) for item in summary.get("asked_questions") or []]
+        questions = [str(item) for item in summary.get("suggestions") or [] if str(item).strip()]
+        generated = bool(questions)
+        if not questions:
+            questions = suggest_questions(
+                repository, _embedder(), current_app.config, session_id, paper
+            )
+            if questions:
+                summary["suggestions"] = questions
+                repository.update_summary(session_id, paper_id, summary)
+        remaining = [item for item in questions if _normalise_question(item) not in asked]
+        return jsonify(
+            {
+                "questions": remaining,
+                "total": len(questions),
+                "asked": len(questions) - len(remaining),
+                "cached": generated,
+            }
+        )
+    except RepositoryError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except EmbeddingError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except Exception:
+        current_app.logger.exception("Question suggestions failed")
+        return jsonify({"questions": [], "total": 0, "asked": 0, "cached": False})
+
+
+def _remember_asked_question(repository, session_id: str, paper: dict, question: str) -> None:
+    """Drop a suggestion from the "Try asking" list once it has been answered."""
+    summary = dict(paper.get("summary") or {})
+    suggestions = [str(item) for item in summary.get("suggestions") or []]
+    if not suggestions:
+        return
+    asked = [str(item) for item in summary.get("asked_questions") or []]
+    if _normalise_question(question) not in {_normalise_question(item) for item in suggestions}:
+        return
+    if _normalise_question(question) in {_normalise_question(item) for item in asked}:
+        return
+    asked.append(question)
+    summary["asked_questions"] = asked
+    try:
+        repository.update_summary(session_id, paper["id"], summary)
+    except RepositoryError:
+        current_app.logger.debug("Could not store the asked question list", exc_info=True)
+
+
 @bp.post("/api/papers/<paper_id>/ask")
 @api_login_required
 def ask_paper(paper_id: str):
@@ -618,9 +682,11 @@ def ask_paper(paper_id: str):
         paper = _repository().get_paper(session_id, paper_id)
         if not paper:
             return jsonify({"error": "Paper not found in this account."}), 404
+        repository = _repository()
         result = answer_question(
-            _repository(), _embedder(), current_app.config, session_id, paper, question, detail
+            repository, _embedder(), current_app.config, session_id, paper, question, detail
         )
+        _remember_asked_question(repository, session_id, paper, question)
         return jsonify(result)
     except RepositoryError as exc:
         return jsonify({"error": str(exc)}), 503
