@@ -7,6 +7,29 @@ uploaded, *Try asking* shows questions built from its title, sections and key te
 local model then rewrites them in the background into sharper questions about that paper,
 and each one disappears from the list once you have asked it.
 
+## What is in this build
+
+- **Fully offline after setup** — no Supabase, no Groq, no Google sign-in, no API key.
+  SQLite + on-disk PDFs + a local GGUF model; every request stays on `127.0.0.1`.
+- **Page-cited answers** — every statement carries `[p. N]`, and the evidence passages are
+  shown with the answer. No citation, no claim.
+- **Questions taken from the paper** — *Try asking* lists full questions built from that
+  paper's own title, sections and terms; the local model sharpens them in the background and
+  a question disappears once it has been answered.
+- **Answer-length switch** — Short / Balanced / Detailed in the chat header, remembered per
+  browser and enforced with a token budget.
+- **Bring your own model** — presets download with one click; any Hugging Face `.gguf` can be
+  pasted as a link; models from LM Studio and Ollama are detected automatically; switching is
+  hot (no restart).
+- **Scanned PDFs, tables, equations** — optional OCR add-on, tables stored as Markdown,
+  formulas kept with their pages.
+- **Local accounts** — email/password, per-user paper library, history and PDF download.
+- **Answers in the question's language** — ask in Hindi, get Hindi, still with page citations.
+- **129 automated tests** plus a browser-level test report in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+Human-readable guides: [SETUP_STEPS.md](SETUP_STEPS.md) (Hinglish walkthrough) and
+[MODEL_INSTALL_STEPS.md](MODEL_INSTALL_STEPS.md) (installing a model, English).
+
 ## One-time setup
 
 1. Install Python 3.10+ (on Windows tick **"Add python.exe to PATH"**).
