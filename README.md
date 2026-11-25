@@ -146,6 +146,8 @@ Presets that are not on disk show **click to download** — clicking starts the 
 app (progress is shown on the chip, `POST /api/models/download` + `GET /api/models/download`), and
 the finished model becomes the selected one.
 
+Step-by-step (Hinglish) with sizes, link copying and fixes: **[MODEL_INSTALL_STEPS.md](MODEL_INSTALL_STEPS.md)**.
+
 ### Adding any other model
 
 Two ways, both end with the file inside the app's `models/` folder and the model selected:

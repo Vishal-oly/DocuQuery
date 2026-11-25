@@ -108,6 +108,8 @@ Bas. Internet ki zaroorat nahi, Ollama/LM Studio ki zaroorat nahi.
 
 ---
 
+> Model install karne ke **poora step-by-step** (sizes, Hugging Face link, troubleshooting): **`MODEL_INSTALL_STEPS.md`** — usi folder me rakha hai.
+
 ## Model kaun sa use hoga — aur badalna kaise
 
 **Pehli baar me automatic choice:** app aapke laptop ki RAM dekh kar model chunti hai (kam RAM → 0.5B, theek-thaak → 1.5B, zyada → 3B). Aapko kuch set nahi karna.
