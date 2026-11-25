@@ -62,6 +62,20 @@ It adds `pypdfium2` (page rendering), `rapidocr-onnxruntime` (ONNX OCR, models b
 offline. Pages without a text layer are recognised automatically; `OCR_MAX_PAGES`
 (default 20) and `OCR_ENABLED=false` control it. OCR is slower than text extraction.
 
+### Other languages
+
+You can ask in Hindi, Spanish, French, German, Italian, Chinese and more. Two things happen:
+
+1. **Retrieval translation** — if the question is not English, the local model translates it for
+   the search step only, so an English paper still matches (`translate_query`).
+2. **Answer language** — the prompt tells the model to reply in the language of the question and
+   to keep `[p. N]` markers unchanged.
+
+Honest limits: the 0.5B preset is mostly English; for Hindi or other languages pick
+`default` (1.5B) or `large` (3B) with `python local_ai.py --model large`. Very low-resource
+languages will be translated but answered shakily, and the stored paper text must be readable
+(OCR/English text) for retrieval to find anything.
+
 ### Asking for questions
 
 The chat offers twelve one-click questions: six on the first row (Objective, Methods,

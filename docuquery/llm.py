@@ -271,6 +271,51 @@ def answer_detail(config: dict[str, Any], detail: str | None = None) -> str:
     return choice if choice in DETAIL_STYLES else "balanced"
 
 
+_NON_ENGLISH_WORDS = {
+    # Spanish / Portuguese
+    "qué", "que", "cuál", "cual", "cómo", "como", "por", "para", "objetivo", "método",
+    "resultados", "qual", "são", "não", "uma", "los", "las", "del", "resumen", "objetivo",
+    # French
+    "quel", "quelle", "comment", "pourquoi", "objectif", "méthode", "résultats", "avec",
+    # German
+    "wie", "warum", "ziel", "methode", "ergebnisse", "welche", "ist", "und",
+    # Italian
+    "quale", "perché", "obiettivo", "metodo", "risultati",
+}
+
+
+def looks_non_english(text: str) -> bool:
+    """True when the question is probably not English (other script or foreign words)."""
+    letters = [char for char in text if char.isalpha()]
+    if not letters:
+        return False
+    non_latin = sum(1 for char in letters if ord(char) > 0x024F)
+    if non_latin / len(letters) > 0.15:
+        return True
+    words = re.findall(r"[^\W\d_]+", (text or "").lower())
+    hits = sum(1 for word in words if word in _NON_ENGLISH_WORDS)
+    return hits >= 2
+
+
+def translate_query(question: str, config: dict[str, Any]) -> str | None:
+    """Translate a question into English so retrieval can match an English paper."""
+    try:
+        answer = _chat(
+            config,
+            [
+                {"role": "system",
+                 "content": "You are a translator. Translate the user's question into plain English. "
+                            "Output only the translation, no quotes, no explanation."},
+                {"role": "user", "content": question},
+            ],
+            max_tokens=120,
+        )
+    except LLMError:
+        return None
+    cleaned = answer.strip().strip('"').strip()
+    return cleaned or None
+
+
 def generate_questions(context: str, config: dict[str, Any], count: int = 8,
                        style: str = "exam") -> str:
     """Turn retrieved passages into exam-style questions the paper can answer."""
@@ -335,6 +380,8 @@ def answer_from_context(question: str, context: str, config: dict[str, Any],
         "and never copy the paper's own reference numbers such as [33.31]. "
         "Write full sentences and explain the reasoning in the passages before concluding. "
         "Some passages are Markdown tables or equations; read them carefully and state the numbers they contain. "
+        "Answer in the same language the question is written in; if the question is in Hindi, reply in Hindi, "
+        "and keep page markers such as [p. 7] unchanged. "
         "If the passages do not answer the question, say that the paper excerpts do not provide enough evidence."
     )
     user = f"""Question: {question}

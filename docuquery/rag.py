@@ -8,6 +8,8 @@ from .llm import (
     answer_from_context,
     generate_questions,
     generate_structured_summary,
+    looks_non_english,
+    translate_query,
 )
 
 _PAGE_REF = re.compile(r"\[\s*p\.?\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]", re.IGNORECASE)
@@ -343,9 +345,16 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
 
 
 def answer_question(repository, embedder, config: dict[str, Any], session_id: str, paper: dict[str, Any], question: str, detail: str | None = None) -> dict[str, Any]:
-    vector = embedder.embed([question])[0]
+    retrieval_question = question
+    translated = None
+    if looks_non_english(question):
+        # The paper is usually English: translate the question just for retrieval.
+        translated = translate_query(question, config)
+        if translated:
+            retrieval_question = translated
+    vector = embedder.embed([retrieval_question])[0]
     chunks = boost_data_chunks(
-        question,
+        retrieval_question,
         repository.search_chunks(
             session_id,
             paper["id"],
@@ -395,4 +404,6 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
     except LLMError as exc:
         answer = sanitize_answer(_fallback_answer(exc, chunks))
         mode = "Retrieval preview — model offline"
+    if translated:
+        mode = f"{mode} · asked in another language"
     return {"answer": answer, "mode": mode, "sources": sources}

@@ -147,3 +147,45 @@ def test_excerpt_trims_at_sentence_boundary_and_drops_stray_page_number():
     assert not excerpt.startswith("9 ")
     assert excerpt.endswith(".")
     assert len(excerpt) <= 130
+
+
+def test_looks_non_english_detects_scripts_and_foreign_words():
+    from docuquery.llm import looks_non_english
+
+    assert looks_non_english("मुख्य उद्देश्य क्या है?")
+    assert looks_non_english("¿cuál es el objetivo principal?")
+    assert not looks_non_english("What is the main objective of this paper?")
+    assert not looks_non_english("How do the methods compare with the baselines?")
+
+
+def test_non_english_question_is_translated_for_retrieval(monkeypatch):
+    embedded = {}
+
+    class RecordingEmbedder:
+        def embed(self, texts):
+            embedded["text"] = texts[0]
+            return [[0.1, 0.2, 0.3] for _ in texts]
+
+    monkeypatch.setattr(rag, "translate_query", lambda question, config: "what is the main objective")
+    monkeypatch.setattr(rag, "answer_from_context", lambda *a, **k: "मुख्य उद्देश्य है ... [p. 1]")
+
+    result = rag.answer_question(
+        FakeRepository(_chunks(6)), RecordingEmbedder(), {}, "s",
+        {"id": "p", "filename": "paper.pdf"}, "मुख्य उद्देश्य क्या है?",
+    )
+    assert embedded["text"] == "what is the main objective"
+    assert "another language" in result["mode"]
+    assert "मुख्य उद्देश्य" in result["answer"]
+
+
+def test_english_question_is_not_translated(monkeypatch):
+    def boom(*args, **kwargs):
+        raise AssertionError("translate_query should not run for English questions")
+
+    monkeypatch.setattr(rag, "translate_query", boom)
+    monkeypatch.setattr(rag, "answer_from_context", lambda *a, **k: "answer [p. 2]")
+    result = rag.answer_question(
+        FakeRepository(_chunks(6)), _FakeEmbedder(), {}, "s",
+        {"id": "p", "filename": "paper.pdf"}, "what methods were used?",
+    )
+    assert "another language" not in result["mode"]
