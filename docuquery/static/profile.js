@@ -156,13 +156,237 @@
     try {
       const health = await api('/api/health');
       $('#settingDatabase').textContent = health.database || '—';
-      $('#settingLlm').textContent = health.llm_available ? `${health.llm_model} (Groq ready)` : 'Preview mode (no Groq key)';
+      $('#settingLlm').textContent = health.llm_available
+        ? `${health.llm_model || 'default model'} (${health.llm_label || 'local model'} ready)`
+        : 'Preview mode (local model unavailable)';
       $('#settingEmbedding').textContent = health.embedding_backend || '—';
       $('#settingUpload').textContent = `${health.max_upload_mb || 20} MB`;
-      $('#footerStatus').textContent = health.llm_available ? `Groq ready · ${health.llm_model}` : 'Preview mode · add a Groq key for generated answers';
+      $('#footerStatus').textContent = health.llm_available
+        ? `${health.llm_label || 'Local model'} ready · ${health.llm_model || 'default model'}`
+        : 'Preview mode · no local model is running';
     } catch (error) {
       showToast(error.message);
     }
+  }
+
+  let modelState = null;
+
+  function renderModels(payload) {
+    modelState = payload;
+    const ram = payload.ram_gb ? `${payload.ram_gb} GB RAM` : 'memory unknown';
+    const recommended = payload.recommended_label ? ` · recommended: ${payload.recommended_label}` : '';
+    $('#modelHardware').textContent =
+      `${ram}${recommended}${payload.managed ? ' · switching is automatic' : ''}`;
+    const list = $('#modelOptions');
+    list.replaceChildren();
+    (payload.options || []).forEach((option) => {
+      const label = document.createElement('label');
+      label.className = 'model-option';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'modelChoice';
+      radio.value = option.id;
+      radio.checked = option.id === payload.selected_id;
+      const copy = document.createElement('span');
+      copy.className = 'model-option-copy';
+      const title = document.createElement('strong');
+      title.textContent = option.label;
+      const meta = document.createElement('span');
+      const parts = [];
+      if (option.size_mb) parts.push(`${option.size_mb} MB`);
+      if (option.source) parts.push(option.source);
+      if (option.recommended) parts.push('recommended');
+      if (option.kind === 'preset' && !option.downloaded) parts.push('downloads when you pick it');
+      meta.textContent = parts.join(' · ');
+      copy.append(title, meta);
+      label.append(radio, copy);
+      radio.addEventListener('change', () => { $('#modelApply').disabled = false; });
+      list.append(label);
+    });
+    $('#modelApply').disabled = true;
+    const folder = $('#modelFolder');
+    if (folder) {
+      folder.textContent = payload.models_dir || 'models folder';
+      folder.title = payload.models_dir || '';
+    }
+    const space = $('#modelSpace');
+    if (space) {
+      const free = Number(payload.free_space_mb || 0);
+      space.textContent = free
+        ? `${(free / 1024).toFixed(1)} GB free in that folder. Any other .gguf you drop there appears in this list.`
+        : 'Any other .gguf you drop in that folder appears in this list.';
+    }
+    const current = payload.current || {};
+    const anyDownloaded = (payload.options || []).some((option) => option.downloaded);
+    $('#modelNote').textContent = current.available
+      ? `In use now: ${current.model || 'model'} (${current.label})`
+      : anyDownloaded
+        ? 'Model is downloaded but not answering yet — it starts within a few seconds of a download.'
+        : 'No model downloaded yet. Pick a preset above and press "Use selected model" to fetch it (internet needed once).';
+  }
+
+  async function loadModels() {
+    try {
+      renderModels(await api('/api/models'));
+    } catch (error) {
+      $('#modelHardware').textContent = 'Could not read the local model list.';
+    }
+  }
+
+  $('#modelApply').addEventListener('click', async () => {
+    const picked = document.querySelector('input[name="modelChoice"]:checked');
+    if (!picked) return;
+    $('#modelApply').disabled = true;
+    try {
+      const result = await api('/api/models/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: picked.value }),
+      });
+      $('#modelNote').textContent = result.message || 'Saved.';
+      const chosen = ((modelState && modelState.options) || []).find((option) => option.id === picked.value);
+      if (chosen && chosen.kind === 'preset' && !chosen.downloaded) {
+        await startModelDownload(chosen, picked.value);
+        return;
+      }
+      if (result.managed) {
+        setTimeout(loadStatus, 6000);
+        setTimeout(loadModels, 6000);
+      }
+    } catch (error) {
+      $('#modelNote').textContent = error.message;
+      $('#modelApply').disabled = false;
+    }
+  });
+
+  function watchDownload(note, label, onFinish) {
+    let timer = null;
+    const stop = () => {
+      if (timer !== null) window.clearInterval(timer);
+      timer = null;
+    };
+    timer = window.setInterval(async () => {
+      try {
+        const status = await api('/api/models/download');
+        if (status.state === 'downloading') {
+          const done = status.received_mb || 0;
+          const total = status.total_mb || 0;
+          const percent = status.percent === null || status.percent === undefined
+            ? `${done} MB`
+            : `${status.percent}%${total ? ` of ${total} MB` : ''}`;
+          note.textContent = `Downloading ${label} — ${percent}`;
+          return;
+        }
+        stop();
+        if (status.state === 'done') {
+          note.textContent = `${status.label || label} is saved and selected. It is listed under AI model above.`;
+          showToast(`${status.label || label} is ready.`);
+          await loadModels();
+          await loadStatus();
+        } else if (status.state === 'error') {
+          note.textContent = status.error || 'Download failed. Check your internet connection.';
+        }
+        if (onFinish) onFinish(status);
+      } catch (error) {
+        stop();
+        note.textContent = error.message;
+        if (onFinish) onFinish({ state: 'error', error: error.message });
+      }
+    }, 1500);
+    return stop;
+  }
+
+  async function startLinkDownload(url) {
+    const note = $('#modelLinkNote');
+    const input = $('#modelLinkInput');
+    const button = $('#modelLinkButton');
+    note.textContent = 'Starting the download…';
+    button.disabled = true;
+    input.disabled = true;
+    try {
+      await api('/api/models/download-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      note.textContent = 'Downloading — this needs internet only this once.';
+      input.value = '';
+      watchDownload(note, 'the model', () => { button.disabled = false; input.disabled = false; });
+    } catch (error) {
+      note.textContent = error.message;
+      button.disabled = false;
+      input.disabled = false;
+    }
+  }
+
+  const linkForm = $('#modelLinkForm');
+  if (linkForm) {
+    linkForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = $('#modelLinkInput');
+      const url = input.value.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        $('#modelLinkNote').textContent = 'Paste a link that starts with https:// — the direct .gguf file link.';
+        input.focus();
+        return;
+      }
+      startLinkDownload(url);
+    });
+  }
+
+  const revealButton = $('#modelReveal');
+  if (revealButton) {
+    revealButton.addEventListener('click', async () => {
+      try {
+        const result = await api('/api/models/reveal', { method: 'POST' });
+        $('#modelSpace').textContent = result.ok
+          ? 'Folder opened — drop any .gguf into it and reload this page.'
+          : `Open this folder yourself: ${result.path}`;
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  }
+
+  async function startModelDownload(option, id) {
+    const note = $('#modelNote');
+    note.textContent = `Downloading ${option.label} — internet is needed only this once…`;
+    try {
+      await api('/api/models/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch (error) {
+      note.textContent = error.message;
+      $('#modelApply').disabled = false;
+      return;
+    }
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await api('/api/models/download');
+        if (status.state === 'downloading') {
+          const percent = status.percent === null || status.percent === undefined
+            ? `${status.received_mb || 0} MB`
+            : `${status.percent}%`;
+          note.textContent = `Downloading ${option.label} — ${percent}`;
+          return;
+        }
+        window.clearInterval(timer);
+        if (status.state === 'done') {
+          note.textContent = `${option.label} is ready and selected.`;
+          await loadModels();
+          await loadStatus();
+        } else if (status.state === 'error') {
+          note.textContent = status.error || 'Download failed. Check your internet connection.';
+          $('#modelApply').disabled = false;
+        }
+      } catch (error) {
+        window.clearInterval(timer);
+        note.textContent = error.message;
+        $('#modelApply').disabled = false;
+      }
+    }, 2000);
   }
 
   $('#nameForm').addEventListener('submit', async (event) => {
@@ -273,6 +497,7 @@
     }
     await loadFiles();
     await loadStatus();
+    await loadModels();
   }
 
   // Buttons/Enter keys work even where native form submission is blocked (sandboxed iframes).

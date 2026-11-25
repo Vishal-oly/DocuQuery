@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 from functools import wraps
 import json
 import re
-import secrets
+import threading
 import uuid
 
 from itsdangerous import URLSafeTimedSerializer
 
 from io import BytesIO
+from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -27,9 +28,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from .embeddings import EmbeddingError
-from .google_auth import GoogleAuthError, verify_google_credential
+from .llm import model_status
+from .ocr import available as ocr_available
 from .pdf_processing import PDFProcessingError, parse_pdf_bytes
 from .rag import answer_question, make_summary
+from .tables import tables_available
 from .repository import RepositoryError, UserExistsError
 
 bp = Blueprint("main", __name__)
@@ -114,7 +117,6 @@ def _sign_in(user: dict) -> None:
     """Mark the browser as signed in; papers become scoped to the account."""
     session.clear()
     session["user"] = _public_user(user)
-    # The account id is a UUID, so it also works as the Supabase session scope.
     session["research_session_id"] = str(user["id"])
     session.permanent = True
     return issue_token(str(user["id"]))
@@ -190,7 +192,6 @@ def login_page():
         user=_current_user(),
         next=request.args.get("next", ""),
         mode=request.args.get("mode", "login"),
-        google_client_id=current_app.config.get("GOOGLE_CLIENT_ID", ""),
     )
 
 
@@ -268,47 +269,6 @@ def login():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid email or password."}), 401
 
-    _sign_in(user)
-    return jsonify({"user": _public_user(user), "token": issue_token(str(user["id"]))}), 200
-
-
-@bp.post("/api/auth/google")
-def google_login():
-    """One-tap Google Sign-In: verify the ID token, then create or join the account."""
-    body = request.get_json(silent=True) or {}
-    credential = str(body.get("credential", "")).strip()
-    try:
-        claims = verify_google_credential(
-            credential, current_app.config.get("GOOGLE_CLIENT_ID", "")
-        )
-    except GoogleAuthError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    email = str(claims.get("email", "")).strip().lower()
-    name = str(
-        claims.get("name") or claims.get("given_name") or email.split("@")[0]
-    ).strip()[:60] or "Google User"
-
-    try:
-        user = _repository().get_user_by_email(email)
-        if not user:
-            user = _repository().save_user(
-                {
-                    "id": str(uuid.uuid4()),
-                    "name": name,
-                    "email": email,
-                    # Google users get a random unusable password; they sign in with Google.
-                    "password_hash": generate_password_hash(secrets.token_urlsafe(32)),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-    except UserExistsError:  # two simultaneous first-time sign-ins for one email
-        user = _repository().get_user_by_email(email)
-    except RepositoryError as exc:
-        return jsonify({"error": str(exc)}), 503
-
-    if not user:
-        return jsonify({"error": "Could not create your account."}), 500
     _sign_in(user)
     return jsonify({"user": _public_user(user), "token": issue_token(str(user["id"]))}), 200
 
@@ -442,16 +402,101 @@ def reset_password():
 @bp.get("/api/health")
 def health():
     config = current_app.config
+    model = model_status(config)
     return jsonify(
         {
             "status": "ok",
             "database": _repository().mode,
-            "llm_available": bool(config.get("GROQ_API_KEY")),
-            "llm_model": config.get("GROQ_MODEL"),
+            "llm_available": model["available"],
+            "llm_model": model["model"],
+            "llm_backend": model["backend"],
+            "llm_label": model["label"],
+            "ocr_available": ocr_available(),
+            "tables_available": tables_available(),
             "embedding_backend": config.get("EMBEDDING_BACKEND"),
             "max_upload_mb": max(1, int(config.get("MAX_CONTENT_LENGTH", 20 * 1024 * 1024) / (1024 * 1024))),
         }
     )
+
+
+@bp.get("/api/models")
+@api_login_required
+def api_models():
+    from .model_registry import describe
+
+    return jsonify(describe(current_app.config))
+
+
+@bp.post("/api/models/select")
+@api_login_required
+def api_select_model():
+    from .model_registry import find_option, write_selection
+
+    payload = request.get_json(silent=True) or {}
+    option = find_option(str(payload.get("id") or ""))
+    if not option:
+        return jsonify({"error": "That model is not available on this computer."}), 400
+    kind = str(option["kind"])
+    value = str(option.get("value") or option.get("path") or "")
+    try:
+        write_selection(kind, value, str(option.get("label") or ""))
+    except (ValueError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    managed = bool(current_app.config.get("MANAGED_MODEL"))
+    return jsonify({
+        "ok": True,
+        "managed": managed,
+        "selected_id": option["id"],
+        "message": ("Switching model — answers may pause for a few seconds."
+                    if managed else
+                    "Saved. Restart DocuQuery with start.bat to use this model."),
+    })
+
+
+@bp.post("/api/models/download")
+@api_login_required
+def api_download_model():
+    """Fetch a built-in preset in the background; the UI polls the status route."""
+    from .model_registry import start_download
+
+    payload = request.get_json(silent=True) or {}
+    preset = str(payload.get("id") or "").replace("preset:", "").strip()
+    try:
+        status = start_download(preset)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "status": status}), 202
+
+
+@bp.post("/api/models/download-url")
+@api_login_required
+def api_download_model_url():
+    """Save any GGUF the person links to, inside the app's models folder."""
+    from .model_registry import start_custom_download
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        status = start_custom_download(str(payload.get("url") or ""))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "status": status}), 202
+
+
+@bp.post("/api/models/reveal")
+@api_login_required
+def api_reveal_models():
+    """Open the models folder so a .gguf can be dropped in by hand."""
+    from .model_registry import reveal_models_dir
+
+    return jsonify(reveal_models_dir())
+
+
+@bp.get("/api/models/download")
+@api_login_required
+def api_download_status():
+    from .model_registry import download_status
+
+    return jsonify(download_status())
 
 
 @bp.get("/api/papers")
@@ -483,12 +528,24 @@ def upload_pdf():
     if not upload or not upload.filename:
         return jsonify({"error": "Choose a PDF file to upload."}), 400
     filename = secure_filename(upload.filename)
-    if not filename or not filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are supported."}), 400
+    if not filename.lower().endswith(".pdf"):
+        # Non-Latin names (Hindi, Chinese, ...) lose everything in secure_filename,
+        # so keep a readable fallback instead of rejecting a real PDF.
+        suffix = Path(filename).suffix.lower()
+        if suffix and suffix != ".pdf":
+            return jsonify({"error": "Only PDF files are supported."}), 400
+        stem = Path(filename).stem if filename else ""
+        filename = f"{stem if stem and stem != 'pdf' else 'paper'}.pdf"
 
     try:
         raw = upload.read()
-        parsed = parse_pdf_bytes(raw, filename)
+        if not raw.lstrip()[:5].startswith(b"%PDF-"):
+            return jsonify({"error": "That file does not look like a PDF. Try exporting it again."}), 400
+        parsed = parse_pdf_bytes(
+            raw, filename,
+            ocr_max_pages=int(current_app.config.get("OCR_MAX_PAGES", 20)),
+            extract_tables=bool(current_app.config.get("TABLE_EXTRACTION", True)),
+        )
         embedder = _embedder()
         vectors = embedder.embed([chunk["content"] for chunk in parsed["chunks"]])
         if len(vectors) != len(parsed["chunks"]):
@@ -514,7 +571,7 @@ def upload_pdf():
         }
         chunk_rows = []
         fallback_chunks = []
-        for raw_chunk, embedding in zip(parsed["chunks"], vectors):
+        for raw_chunk, embedding in zip(parsed["chunks"], vectors, strict=False):
             row = {
                 "id": str(uuid.uuid4()),
                 "paper_id": paper_id,
@@ -522,6 +579,7 @@ def upload_pdf():
                 "page_number": raw_chunk["page_number"],
                 "section": raw_chunk["section"],
                 "content": raw_chunk["content"],
+                "kind": raw_chunk.get("kind", "text"),
                 "embedding": embedding,
             }
             chunk_rows.append(row)
@@ -542,6 +600,9 @@ def upload_pdf():
         summary["sources"] = sources
         paper["summary"] = summary
         repository.update_summary(session_id, paper_id, summary)
+        app_object = current_app._get_current_object()
+        _store_quick_suggestions(repository, session_id, paper, chunk_rows)
+        _schedule_suggestions(app_object, session_id, paper_id)
 
         return jsonify(
             {
@@ -550,15 +611,157 @@ def upload_pdf():
                 "chunk_count": len(chunk_rows),
                 "database": repository.mode,
                 "text_char_count": parsed["text_char_count"],
+                "table_chunks": parsed.get("table_chunks", 0),
+                "ocr_pages": parsed.get("ocr_pages", 0),
             }
         ), 201
     except PDFProcessingError as exc:
         return jsonify({"error": str(exc)}), 400
     except (RepositoryError, EmbeddingError) as exc:
         return jsonify({"error": str(exc)}), 503
-    except Exception as exc:
+    except Exception:
         current_app.logger.exception("PDF upload failed")
-        return jsonify({"error": f"Could not process this PDF: {exc}"}), 500
+        return jsonify(
+            {"error": "Could not process this PDF. It may be corrupted or password protected."}
+        ), 500
+
+
+_SUGGESTION_LOCK = threading.Lock()
+_SUGGESTION_INFLIGHT: set[str] = set()
+
+
+def _model_reachable(config) -> bool:
+    try:
+        return bool(model_status(config).get("available"))
+    except Exception:
+        return False
+
+
+def _store_quick_suggestions(repository, session_id: str, paper: dict, chunks: list[dict]) -> None:
+    """Write text-derived questions right away so the chips are instant."""
+    from .rag import quick_questions
+
+    summary = dict(paper.get("summary") or {})
+    if summary.get("suggestions"):
+        return
+    questions = quick_questions(chunks, paper)
+    if not questions:
+        return
+    summary["suggestions"] = questions
+    summary["suggestions_source"] = "heuristic"
+    try:
+        repository.update_summary(session_id, paper["id"], summary)
+    except RepositoryError:
+        current_app.logger.debug("Could not store the quick question list", exc_info=True)
+
+
+def _schedule_suggestions(app, session_id: str, paper_id: str) -> None:
+    """Ask the local model for better questions in the background, without blocking anyone."""
+    if not _model_reachable(app.config):
+        return
+    with _SUGGESTION_LOCK:
+        if paper_id in _SUGGESTION_INFLIGHT:
+            return
+        _SUGGESTION_INFLIGHT.add(paper_id)
+
+    def worker() -> None:
+        from .llm import LLMError
+        from .rag import model_questions
+
+        try:
+            with app.app_context():
+                repository = _repository()
+                paper = repository.get_paper(session_id, paper_id)
+                if not paper:
+                    return
+                summary = dict(paper.get("summary") or {})
+                if summary.get("suggestions_source") == "model" or summary.get("asked_questions"):
+                    return
+                questions = model_questions(repository, app.config, session_id, paper)
+                fresh = repository.get_paper(session_id, paper_id)
+                if not fresh:
+                    return
+                latest = dict(fresh.get("summary") or {})
+                if latest.get("asked_questions") or latest.get("suggestions_source") == "model":
+                    return
+                latest["suggestions"] = questions
+                latest["suggestions_source"] = "model"
+                repository.update_summary(session_id, paper_id, latest)
+        except LLMError as exc:
+            app.logger.debug("Keeping text-derived questions: %s", exc)
+        except Exception:
+            app.logger.debug("Background question generation failed", exc_info=True)
+        finally:
+            with _SUGGESTION_LOCK:
+                _SUGGESTION_INFLIGHT.discard(paper_id)
+
+    threading.Thread(target=worker, name=f"dq-suggestions-{paper_id[:8]}", daemon=True).start()
+
+
+def _normalise_question(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+@bp.get("/api/papers/<paper_id>/suggestions")
+@api_login_required
+def paper_suggestions(paper_id: str):
+    """Questions worth asking about this paper; the model refines them in the background."""
+    session_id = _session_id()
+    try:
+        repository = _repository()
+        paper = repository.get_paper(session_id, paper_id)
+        if not paper:
+            return jsonify({"error": "Paper not found in this account."}), 404
+        summary = dict(paper.get("summary") or {})
+        asked = [_normalise_question(item) for item in summary.get("asked_questions") or []]
+        questions = [str(item) for item in summary.get("suggestions") or [] if str(item).strip()]
+        source = str(summary.get("suggestions_source") or "")
+        cached = bool(questions)
+        if not questions:
+            chunks = repository.list_chunks(session_id, paper_id)
+            _store_quick_suggestions(repository, session_id, paper, chunks)
+            refreshed = repository.get_paper(session_id, paper_id) or paper
+            summary = dict(refreshed.get("summary") or {})
+            questions = [str(item) for item in summary.get("suggestions") or [] if str(item).strip()]
+            source = str(summary.get("suggestions_source") or "")
+        _schedule_suggestions(current_app._get_current_object(), session_id, paper_id)
+        remaining = [item for item in questions if _normalise_question(item) not in asked]
+        ready = source == "model" or not _model_reachable(current_app.config)
+        return jsonify(
+            {
+                "questions": remaining,
+                "total": len(questions),
+                "asked": len(questions) - len(remaining),
+                "cached": cached,
+                "ready": ready,
+            }
+        )
+    except RepositoryError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except EmbeddingError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except Exception:
+        current_app.logger.exception("Question suggestions failed")
+        return jsonify({"questions": [], "total": 0, "asked": 0, "cached": False})
+
+
+def _remember_asked_question(repository, session_id: str, paper: dict, question: str) -> None:
+    """Drop a suggestion from the "Try asking" list once it has been answered."""
+    summary = dict(paper.get("summary") or {})
+    suggestions = [str(item) for item in summary.get("suggestions") or []]
+    if not suggestions:
+        return
+    asked = [str(item) for item in summary.get("asked_questions") or []]
+    if _normalise_question(question) not in {_normalise_question(item) for item in suggestions}:
+        return
+    if _normalise_question(question) in {_normalise_question(item) for item in asked}:
+        return
+    asked.append(question)
+    summary["asked_questions"] = asked
+    try:
+        repository.update_summary(session_id, paper["id"], summary)
+    except RepositoryError:
+        current_app.logger.debug("Could not store the asked question list", exc_info=True)
 
 
 @bp.post("/api/papers/<paper_id>/ask")
@@ -571,22 +774,30 @@ def ask_paper(paper_id: str):
     if len(question) > int(current_app.config.get("MAX_QUESTION_CHARS", 1200)):
         return jsonify({"error": "That question is too long. Please keep it under 1,200 characters."}), 400
 
+    detail = str(body.get("detail", "")).strip().lower() or None
+    if detail not in {"brief", "balanced", "detailed"}:
+        detail = None
+
     session_id = _session_id()
     try:
         paper = _repository().get_paper(session_id, paper_id)
         if not paper:
             return jsonify({"error": "Paper not found in this account."}), 404
+        repository = _repository()
         result = answer_question(
-            _repository(), _embedder(), current_app.config, session_id, paper, question
+            repository, _embedder(), current_app.config, session_id, paper, question, detail
         )
+        _remember_asked_question(repository, session_id, paper, question)
         return jsonify(result)
     except RepositoryError as exc:
         return jsonify({"error": str(exc)}), 503
     except EmbeddingError as exc:
         return jsonify({"error": str(exc)}), 503
-    except Exception as exc:
+    except Exception:
         current_app.logger.exception("Question answering failed")
-        return jsonify({"error": f"Could not answer this question: {exc}"}), 500
+        return jsonify(
+            {"error": "Could not answer that question. Try rephrasing it or ask about another section."}
+        ), 500
 
 
 @bp.delete("/api/papers/<paper_id>")
@@ -742,6 +953,10 @@ def summarize_paper(paper_id: str):
             fallback,
         )
         summary["sources"] = sources
+        previous = dict(paper.get("summary") or {})
+        for key in ("suggestions", "suggestions_source", "asked_questions"):
+            if key in previous:
+                summary[key] = previous[key]
         paper["summary"] = summary
         _repository().update_summary(session_id, paper_id, summary)
         return jsonify({"paper": _public_paper(paper), "summary": summary})

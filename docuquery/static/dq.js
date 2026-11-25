@@ -71,14 +71,17 @@ window.DQAuth = (() => {
     // header, and the server accepts either source.
     // Never hang forever — if the server dies mid-request, fail with a clear
     // message instead of leaving the UI stuck on a spinner.
-    const timeoutMs = options.timeoutMs || 90000;
+    const timeoutMs = options.timeoutMs || 180000;
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(withToken(url), { ...options, headers, signal: controller.signal });
     } catch (error) {
       if (error && error.name === 'AbortError') {
-        throw new Error('Server is not responding (timed out). Please refresh and try again.');
+        throw new Error(
+          'This is taking longer than expected. PDF processing and local model answers can '
+          + 'need a few minutes on a laptop CPU — wait a little, then refresh and try again.',
+        );
       }
       throw error;
     } finally {

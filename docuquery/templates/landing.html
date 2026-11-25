@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#f7f8fc">
   <meta name="description" content="DocuQuery — a retrieval-augmented research assistant for scientific paper PDFs. Upload a paper, get an evidence-grounded brief, and ask questions with page-linked sources.">
   <title>DocuQuery — Scientific Paper Research Assistant</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=7) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=7) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=33) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=33) }}" rel="stylesheet">
 </head>
 <body class="landing-body">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -39,13 +39,13 @@
     <!-- Hero: project name & about -->
     <section class="landing-hero" id="about">
       <div class="landing-hero-copy">
-        <div class="eyebrow"><span class="eyebrow-spark">✳</span> SCIENTIFIC PAPER RESEARCH ASSISTANT</div>
+        <div class="eyebrow"><span class="eyebrow-spark">✳</span> SCIENTIFIC PAPER RESEARCH ASSISTANT · 100% ON-DEVICE</div>
         <h1>Read less.<br><span>Understand more.</span></h1>
         <p class="landing-lead">
-          <strong>DocuQuery</strong> is a retrieval-augmented web assistant for scientific-paper PDFs.
-          Upload a research paper and get a structured research brief, page-linked evidence,
-          and grounded answers to your questions — so every claim can be traced back to the source.
+          <strong>DocuQuery</strong> turns a scientific PDF into a structured brief, page-linked
+          evidence, and grounded answers you can trace.
         </p>
+        <p class="landing-privacy-line"><span aria-hidden="true">⌂</span> Runs entirely on your laptop — no cloud, no API key, nothing uploaded.</p>
         <div class="landing-cta">
           {% if user %}
             <a class="btn btn-primary-soft btn-lg-soft" href="/workspace">Open my workspace →</a>
@@ -56,8 +56,9 @@
         </div>
         <div class="hero-meta">
           <span><span class="meta-check">✓</span> Page-linked sources</span>
-          <span><span class="meta-check">✓</span> Structured research briefs</span>
-          <span><span class="meta-check">✓</span> Ask this paper anything</span>
+          <span><span class="meta-check">✓</span> Structured briefs</span>
+          <span><span class="meta-check">✓</span> Ask this paper</span>
+          <span><span class="meta-check">✓</span> Works offline after setup</span>
         </div>
       </div>
       <div class="landing-hero-art" aria-hidden="true">
@@ -110,18 +111,97 @@
       </div>
     </section>
 
+    <!-- Privacy -->
+    <section class="landing-section" id="privacy">
+      <div class="section-kicker">PRIVATE BY DESIGN</div>
+      <h2>Your papers stay on your machine</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <div class="feature-icon">⌂</div>
+          <h3>On-device AI</h3>
+          <p>A small Qwen model runs through llama.cpp on your own CPU or GPU. Answers are generated locally — nothing is sent to an external AI service.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">▣</div>
+          <h3>Local storage only</h3>
+          <p>Accounts, summaries, embeddings and the uploaded PDFs live in the <code>instance/</code> folder inside the project. No cloud database, no storage bucket, no external sync.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">⇄</div>
+          <h3>Loopback network</h3>
+          <p>The app and the model server listen on <code>127.0.0.1</code> only. Your Wi-Fi network and the internet cannot reach them.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">✂</div>
+          <h3>Nothing to track you</h3>
+          <p>No analytics, no telemetry, no third-party CDN and no external fonts — the interface ships its own CSS and icons.</p>
+        </article>
+      </div>
+      <p class="landing-privacy-note">The model is downloaded once, only when you pick it inside the app. After that you can unplug the internet and everything keeps working.</p>
+    </section>
+
     <!-- How it works -->
-    <section class="landing-section landing-section-alt" id="howItWorks">
+    <section class="landing-section landing-section-alt how-section" id="howItWorks">
       <div class="section-kicker">HOW IT WORKS</div>
       <h2>From PDF to grounded answer</h2>
-      <div class="steps-row">
-        <div class="step-card"><span class="step-num">01</span><strong>Upload</strong><p>Validate and extract text page by page</p></div>
-        <div class="step-arrow" aria-hidden="true">→</div>
-        <div class="step-card"><span class="step-num">02</span><strong>Index</strong><p>Section detection, chunking, embeddings</p></div>
-        <div class="step-arrow" aria-hidden="true">→</div>
-        <div class="step-card"><span class="step-num">03</span><strong>Retrieve</strong><p>Find the most relevant passages</p></div>
-        <div class="step-arrow" aria-hidden="true">→</div>
-        <div class="step-card"><span class="step-num">04</span><strong>Answer</strong><p>Generate a brief with page-linked evidence</p></div>
+      <p class="section-sub">Four steps, all on your laptop — the paper never leaves it.</p>
+      <ol class="steps-grid">
+        <li class="step-card">
+          <span class="step-dot" aria-hidden="true">1</span>
+          <h3>Upload</h3>
+          <p>Validate the PDF and extract its text page by page.</p>
+          <p class="step-plain">Opens your file locally and reads only its text.</p>
+        </li>
+        <li class="step-card">
+          <span class="step-dot" aria-hidden="true">2</span>
+          <h3>Index</h3>
+          <p>Detect sections, split passages, compute embeddings.</p>
+          <p class="step-plain">Turns the paper into a searchable local index.</p>
+        </li>
+        <li class="step-card">
+          <span class="step-dot" aria-hidden="true">3</span>
+          <h3>Retrieve</h3>
+          <p>Pick the few passages that actually answer you.</p>
+          <p class="step-plain">Looks up the right paragraphs before writing.</p>
+        </li>
+        <li class="step-card">
+          <span class="step-dot" aria-hidden="true">4</span>
+          <h3>Answer</h3>
+          <p>Write the brief from those passages, with page links.</p>
+          <p class="step-plain">Every claim shows the page it came from.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Plain words -->
+    <section class="landing-section" id="plainWords">
+      <div class="section-kicker">IN PLAIN WORDS</div>
+      <h2>What the promises on this page mean</h2>
+      <div class="plain-grid">
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">⌂</span><strong>“100% on-device” — the AI is a file on your laptop</strong>
+          <p>The answering model is a ~1 GB file that runs on your CPU or GPU, like a normal app. It is not a website and needs no login.</p>
+        </div>
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">▣</span><strong>“No data leaves your laptop” — nothing is uploaded</strong>
+          <p>Uploading a PDF means “read it into this app”, not “send it to a server”. Your paper, summaries and account stay in the project folder.</p>
+        </div>
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">⌕</span><strong>“Grounded with citations” — you can check every line</strong>
+          <p>Answers point to pages like <code>[p. 4]</code>. Click the page chip and the original PDF opens at that page, so you never have to trust blindly.</p>
+        </div>
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">⇄</span><strong>“Works offline” — internet only for the first setup</strong>
+          <p>The model is downloaded once. After that you can switch off Wi-Fi and still upload, summarise and ask questions.</p>
+        </div>
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">✦</span><strong>“Small model” — fits a normal laptop, with limits</strong>
+          <p>A 0.5B–3B model runs in 4–8 GB of RAM. It can misread numbers, which is exactly why every answer carries its page.</p>
+        </div>
+        <div class="plain-item">
+          <span class="plain-key" aria-hidden="true">◎</span><strong>“Local accounts” — this is a single-laptop tool</strong>
+          <p>Email and password are stored in a local database on your machine. It is built for one person on one laptop, not for the internet.</p>
+        </div>
       </div>
     </section>
 
@@ -139,10 +219,10 @@
 
   <footer class="app-footer landing-footer">
     <span>DocuQuery <span class="footer-separator">·</span> RAG for scientific reading</span>
-    <span>Minor project · Built with Flask, Supabase &amp; Groq</span>
+    <span>Minor project · Flask, SQLite &amp; a local GGUF model</span>
   </footer>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='auth.js', v=7) }}" defer></script>
+  <script src="{{ url_for('static', filename='auth.js', v=33) }}" defer></script>
 </body>
 </html>

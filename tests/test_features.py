@@ -12,9 +12,7 @@ def make_test_app(tmp_path):
         {
             "TESTING": True,
             "SECRET_KEY": "test-key",
-            "GROQ_API_KEY": "",
-            "SUPABASE_URL": "",
-            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "OLLAMA_ENABLED": False,
             "LOCAL_DB_PATH": str(tmp_path / "features.sqlite3"),
         }
     )
@@ -122,7 +120,7 @@ def test_upload_stores_file_and_summary_download(tmp_path):
     # Regenerate the brief.
     regen = client.post(f"/api/papers/{paper['id']}/summarize")
     assert regen.status_code == 200
-    assert regen.get_json()["summary"]["mode"] == "extractive preview"
+    assert regen.get_json()["summary"]["mode"] == "Quick extract (model off)"
 
     # Delete removes the paper and its stored file.
     assert client.delete(f"/api/papers/{paper['id']}").status_code == 200
@@ -178,34 +176,3 @@ def test_other_account_cannot_access_files(tmp_path):
     assert other.get(f"/api/papers/{paper_id}/file").status_code == 404
     assert other.get(f"/api/papers/{paper_id}/download?format=md").status_code == 404
     assert other.post(f"/api/papers/{paper_id}/summarize").status_code == 404
-
-
-def test_groq_errors_are_classified_for_users():
-    """Users must see WHY Groq failed (key missing, rate limit, offline)."""
-    from docuquery.llm import LLMError, _call_groq
-
-    # No key -> tells the user to configure .env
-    try:
-        _call_groq("", "m", [{"role": "user", "content": "hi"}])
-    except LLMError as exc:
-        assert "GROQ_API_KEY" in str(exc) and "not configured" in str(exc)
-    else:
-        raise AssertionError("expected LLMError")
-
-    # Network failure -> internet hint (simulate via unreachable host)
-    import groq as groq_module
-
-    class FakeGroq:
-        def __init__(self, api_key):
-            raise ConnectionError("Failed to establish a new connection: [Errno -3] name resolution")
-
-    original = groq_module.Groq
-    groq_module.Groq = FakeGroq
-    try:
-        _call_groq("gsk_fake", "m", [{"role": "user", "content": "hi"}])
-    except LLMError as exc:
-        assert "internet" in str(exc).lower()
-    else:
-        raise AssertionError("expected LLMError")
-    finally:
-        groq_module.Groq = original

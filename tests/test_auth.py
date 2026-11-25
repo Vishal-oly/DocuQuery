@@ -6,9 +6,7 @@ def make_test_app(tmp_path):
         {
             "TESTING": True,
             "SECRET_KEY": "test-key",
-            "GROQ_API_KEY": "",
-            "SUPABASE_URL": "",
-            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "OLLAMA_ENABLED": False,
             "LOCAL_DB_PATH": str(tmp_path / "auth.sqlite3"),
         }
     )
@@ -91,3 +89,9 @@ def test_login_page_renders_both_modes(tmp_path):
 
     register_page = client.get("/login?mode=register").get_data(as_text=True)
     assert "Create account" in register_page
+
+
+def test_third_party_sign_in_endpoint_is_removed(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    assert client.post("/api/auth/google", json={}).status_code == 404
+    assert "accounts.google.com" not in client.get("/login").get_data(as_text=True)

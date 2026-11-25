@@ -1,3 +1,9 @@
+> **Updated architecture note (offline edition):** DocuQuery now runs entirely on one laptop —
+> Flask + SQLite + a local Qwen GGUF model served by llama.cpp. Groq, Supabase and Google
+> Sign-In were removed, the UI no longer loads CDN assets, and only `127.0.0.1` sockets are used.
+> Cloud-specific sections below are kept as project history. For how it works today see
+> [the offline & privacy guide](OFFLINE_PRIVACY.md) and [project synopsis](PROJECT_SYNOPSIS.md).
+
 # Public repository analysis and design decisions
 
 This note summarizes public examples reviewed for the project concept. The implementation in this workspace is written independently; repository code is used as an architectural reference, not copied.
@@ -32,6 +38,6 @@ This is a Python RAG pipeline that downloads an academic paper, processes the PD
 
 - **Ingestion:** PDF text extraction retains page numbers; section names are detected with conservative heading rules.
 - **Retrieval:** relevant passages are selected before generation; source cards remain visible in the UI.
-- **Generation:** Groq is only the answer/summary model. Embeddings are a separate backend so the app does not assume Groq provides embeddings.
-- **Persistence:** Supabase/pgvector is the configured target; SQLite keeps the project runnable while a Supabase project is being created.
-- **Safety/limitations:** no service-role key enters frontend code; LLM prompts are instructed to use only retrieved text; scanned PDFs and public-production authentication remain explicit future work.
+- **Generation:** a local Qwen2.5 GGUF model runs through llama.cpp on the laptop. Embeddings stay a separate backend (hashing by default) so generation and retrieval use different mechanisms.
+- **Persistence (current):** local SQLite only; PDFs live in `instance/uploads/`. Supabase/pgvector was removed in the offline edition.
+- **Safety/limitations:** no cloud keys exist to leak; LLM prompts are restricted to the retrieved text and the app falls back to those passages when no model runs; scanned PDFs need OCR and the local accounts are single-device by design (see `OFFLINE_PRIVACY.md`).

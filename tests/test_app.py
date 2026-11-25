@@ -12,9 +12,7 @@ def make_test_app(tmp_path):
         {
             "TESTING": True,
             "SECRET_KEY": "test-key",
-            "GROQ_API_KEY": "",
-            "SUPABASE_URL": "",
-            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "OLLAMA_ENABLED": False,
             "LOCAL_DB_PATH": str(tmp_path / "papers.sqlite3"),
         }
     )
@@ -50,6 +48,7 @@ def test_landing_health_and_auth_guards(tmp_path):
     health = client.get("/api/health").get_json()
     assert health["database"] == "local SQLite demo"
     assert health["llm_available"] is False
+    assert health["llm_backend"] in {"ollama", "openai"}
 
 
 def test_workspace_login_flow_and_empty_library(tmp_path):
@@ -104,7 +103,7 @@ def test_upload_chat_and_account_scoping(tmp_path):
     assert paper["page_count"] == 1
     assert "session_id" not in paper
     assert payload["chunk_count"] > 0
-    assert payload["summary"]["mode"] == "extractive preview"
+    assert payload["summary"]["mode"] == "Quick extract (model off)"
     assert payload["summary"]["sources"]
 
     answer = client.post(
@@ -134,3 +133,187 @@ def test_upload_chat_and_account_scoping(tmp_path):
     removed = relogin.delete(f"/api/papers/{paper['id']}")
     assert removed.status_code == 200
     assert relogin.get("/api/papers").get_json()["papers"] == []
+
+
+def test_landing_serves_bootstrap_locally(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    assert '/static/vendor/bootstrap.min.css' in client.get('/').get_data(as_text=True)
+    assert client.get('/static/vendor/bootstrap.min.css').status_code == 200
+
+
+def test_model_picker_lists_and_saves_choice(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    monkeypatch.setenv("MODEL_SELECTION_FILE", str(tmp_path / "models" / "selected.json"))
+    client = make_test_app(tmp_path).test_client()
+
+    assert client.get("/api/models").status_code == 401
+    register_and_login(client, name="Model Fan", email="models@example.com")
+
+    payload = client.get("/api/models").get_json()
+    assert payload["recommended"] in {"small", "default", "large"}
+    assert {option["id"] for option in payload["options"]} >= {"preset:small", "preset:default"}
+    assert payload["current"]["available"] is False
+
+    selected = client.post("/api/models/select", json={"id": "preset:small"})
+    assert selected.status_code == 200
+    assert selected.get_json()["selected_id"] == "preset:small"
+    assert client.get("/api/models").get_json()["selected_id"] == "preset:small"
+
+    assert client.post("/api/models/select", json={"id": "preset:huge"}).status_code == 400
+
+
+def test_health_reports_optional_features(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert "ocr_available" in payload
+    assert "tables_available" in payload
+    assert payload["llm_label"] in {"Local model (llama.cpp)", "Model not loaded", "Local model"}
+
+
+def test_download_routes_are_wired(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, email="downloader@example.com")
+    login = client.post("/api/login", json={"email": "downloader@example.com", "password": "secret123"})
+    headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+
+    status = client.get("/api/models/download", headers=headers)
+    assert status.status_code == 200
+    assert status.get_json()["state"] in {"idle", "downloading", "done", "error"}
+
+    started = {"called": False}
+
+    def fake_start(preset):
+        started["called"] = preset
+        return {"state": "downloading", "id": preset}
+
+    monkeypatch.setattr(model_registry, "start_download", fake_start)
+    response = client.post("/api/models/download", json={"id": "preset:small"}, headers=headers)
+    assert response.status_code == 202
+    assert started["called"] == "small"
+
+
+def test_workspace_chat_form_lives_inside_the_chat_card(tmp_path):
+    """A stray </div> once pushed the composer outside the card and broke the layout."""
+    from html.parser import HTMLParser
+
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, email="layout@example.com")
+    login = client.post("/api/login", json={"email": "layout@example.com", "password": "secret123"})
+    token = login.get_json()["token"]
+    html = client.get(f"/workspace?token={token}").get_data(as_text=True)
+
+    class Tracker(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.stack: list[tuple[str, dict]] = []
+            self.parents = None
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if attrs.get("id") == "chatForm":
+                self.parents = [dict(item) for _tag, item in self.stack]
+            if tag not in {"br", "img", "input", "meta", "link", "hr", "source"}:
+                self.stack.append((tag, attrs))
+
+        def handle_endtag(self, tag):
+            for index in range(len(self.stack) - 1, -1, -1):
+                if self.stack[index][0] == tag:
+                    del self.stack[index:]
+                    return
+
+    parser = Tracker()
+    parser.feed(html)
+    assert parser.parents is not None, "composer form missing"
+    classes = [item.get("class") or "" for item in parser.parents]
+    assert any("chat-card" in value for value in classes), classes
+    assert any("side-column" in value for value in classes), classes
+
+
+def test_upload_accepts_non_latin_filename_and_rejects_fake_pdf(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, name="Nisha", email="nisha@example.com")
+
+    hindi = client.post(
+        "/api/upload",
+        data={"pdf": (BytesIO(SAMPLE_PDF.read_bytes()), "रिपोर्ट.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert hindi.status_code == 201, hindi.get_json()
+    assert hindi.get_json()["paper"]["filename"].endswith(".pdf")
+
+    fake = client.post(
+        "/api/upload",
+        data={"pdf": (BytesIO(b"this is not a pdf at all"), "report.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert fake.status_code == 400
+    assert "does not look like a PDF" in fake.get_json()["error"]
+
+
+def test_workspace_uses_dynamic_paper_specific_suggestions(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client)
+    page = client.get("/workspace").get_data(as_text=True)
+    assert 'id="suggestionList"' in page
+    assert 'id="suggestionActions"' in page
+    # The old one-word static chips are gone; only the three quick actions remain.
+    assert 'data-question="What is the main objective of this paper?"' not in page
+    assert page.count('class="suggestion-chip"') == 3
+
+
+def test_answer_bubbles_always_show_the_mode_label():
+    """Evidence chips used to hide the 'Local model' / 'Passages only' label."""
+    app_js = (Path(__file__).resolve().parents[1] / "docuquery" / "static" / "app.js").read_text()
+    styles = (Path(__file__).resolve().parents[1] / "docuquery" / "static" / "styles.css").read_text()
+    assert "'chat-message-mode'" in app_js
+    assert ".chat-message-mode" in styles
+    # The mode element must not sit in an `else if` that sources can skip.
+    marker = app_js.index("if (role === 'assistant' && mode)")
+    assert "else if (role === 'assistant' && mode)" not in app_js[marker - 80: marker + 40]
+
+
+def test_link_download_and_folder_routes(tmp_path, monkeypatch):
+    """The Profile page can pull any GGUF by link and open the models folder."""
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    started = {}
+
+    def fake_start(url):
+        started["url"] = url
+        return {"state": "downloading", "id": "custom", "label": "Linked model"}
+
+    app = make_test_app(tmp_path)
+    anonymous = app.test_client()
+    assert anonymous.post("/api/models/download-url", json={"url": "https://x/m.gguf"}).status_code == 401
+
+    client = app.test_client()
+    register_and_login(client, email="linker@example.com")
+    login = client.post("/api/login", json={"email": "linker@example.com", "password": "secret123"})
+    headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+
+    # Validation happens before any network call, so this never touches the internet.
+    bad = client.post("/api/models/download-url", json={"url": "ftp://x/m.gguf"}, headers=headers)
+    assert bad.status_code == 400
+    assert "http://" in bad.get_json()["error"]
+
+    monkeypatch.setattr(model_registry, "start_custom_download", fake_start)
+    ok = client.post(
+        "/api/models/download-url",
+        json={"url": "https://huggingface.co/a/b/resolve/main/Model.gguf"},
+        headers=headers,
+    )
+    assert ok.status_code == 202
+    assert started["url"].endswith("Model.gguf")
+
+    reveal = client.post("/api/models/reveal", headers=headers)
+    assert reveal.status_code == 200
+    assert reveal.get_json()["path"] == str(tmp_path / "models")
+
+    listed = client.get("/api/models", headers=headers).get_json()
+    assert listed["models_dir"] == str(tmp_path / "models")
+    assert "free_space_mb" in listed

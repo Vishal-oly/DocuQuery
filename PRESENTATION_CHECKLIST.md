@@ -1,91 +1,77 @@
-# DocuQuery — Presentation Preparation Notes
+# Presentation Checklist — DocuQuery (offline / on-device)
 
-Demo flow, likely questions and talking points.
+## Before the presentation
 
----
+- [ ] `start.bat` runs without errors and prints **"Model ready"**
+- [ ] Model already downloaded (`models\*.gguf` exists) — no waiting on the day
+- [ ] Test account created; sample PDF uploaded; one summary already generated
+- [ ] Two questions rehearsed (one answerable, one out of scope)
+- [ ] Internet-off test done once at home
+- [ ] Laptop charged, charger packed, sleep disabled during the demo
+- [ ] Backup: screenshots of the summary and an answer, in case the model is slow
+- [ ] Browser zoom at ~110%, dark/light theme consistent
+- [ ] Terminal window size such that "Model ready" and "DocuQuery starting" are visible
 
-## 1. Before the demo
+## Slide outline (8–10 slides)
 
-- [ ] Run the app once end-to-end the day before (10 min)
-- [ ] Verify login (`demo@example.com` / `demo123`) and one AI answer
-- [ ] Laptop charged; mobile hotspot available as internet backup
-- [ ] `python run.py` command ready in a terminal
-- [ ] Project report (.docx) and presentation (.pptx) available in `docs/`
-- [ ] No other project tabs open — just the app and these notes
+1. **Title** — DocuQuery: offline research assistant for scientific PDFs.
+2. **Problem** — papers take long to read; cloud chatbots upload documents, hallucinate and
+   give no page-level evidence.
+3. **Goal** — same convenience, but on-device, citation-grounded, offline-capable.
+4. **Architecture** — one diagram: browser → Flask → SQLite → retrieval → llama.cpp server.
+5. **Pipeline** — upload → page extraction → chunking → embeddings → retrieval → brief.
+6. **What the user sees** — screenshot of the structured brief with `[p. 4]` citations.
+7. **Q&A with evidence** — screenshot of a question, answer and evidence chips; mention
+   Short/Balanced/Detailed length switch.
+8. **Privacy & offline** — the four privacy cards: on-device AI, local storage, loopback
+   sockets, no analytics/CDN. State that Groq, Supabase and Google Sign-In were removed.
+9. **Model choice** — 0.5B/1.5B/3B table, RAM-based recommendation, `--gpu`, hot swap from
+   the Profile page.
+10. **Results, limits, future work** — speed numbers, small-model caveats, OCR and
+    cross-paper search as next steps.
 
----
+## Key numbers to quote
 
-## 2. Demo flow (10 minutes)
+| Point | Number |
+| --- | --- |
+| Model download (one time) | 0.4 GB (0.5B) / 1.0 GB (1.5B) / 2.0 GB (3B) |
+| Runtime download | ~25 MB (CPU) or ~40 MB (Vulkan) |
+| Answer speed, 1.5B on CPU | ~8–15 tokens/s (20–60 s per summary) |
+| Default answer length | 120–250 words (switchable to 300–450) |
+| Upload limit | 20 MB |
+| Tests | 65 passing, no network or model needed |
 
-### Opening (30 s)
-> "Good morning sir. My project is **DocuQuery** — a research-paper reading
-> assistant that finds information in PDFs and answers questions with page
-> citations, so every claim can be verified against the source."
+## Likely questions and short answers
 
-### Problem (30 s)
-> "Research papers are long — methods, data and limitations are buried deep.
-> Generic summaries do not show where an answer came from. This project solves
-> exactly that."
+**"Is the data really not uploaded?"**
+Yes — after setup, disconnect the internet and it still works. Show
+`Get-NetTCPConnection` with `127.0.0.1`, and DevTools showing only localhost requests.
 
-### Live demo (5–6 min)
-1. Login with the demo account.
-2. Open the 144-page paper from the library.
-3. **Research Brief** → point at the `[p. N]` citations.
-4. **Evidence Trail** → "these are the exact source excerpts behind each claim".
-5. **Ask This Paper** → `What is pre-training and what data is used for it?`
-6. **Download** button (`.md` / `.txt` / `.json`).
-7. **Profile** → files, password change, clear history (show only).
+**"Which cloud did you remove?"**
+Groq (text generation), Supabase (database, storage, auth) and Google Sign-In. The
+`requirements.txt` no longer lists `groq` or `supabase`, and there is no `google_auth.py`.
 
-### Architecture (1 min)
-> "The pipeline is Retrieval-Augmented Generation: passages are embedded as
-> 384-d vectors, searched with cosine similarity (pgvector HNSW index), and the
-> LLM answers only from the retrieved context — which is why the citations are
-> accurate. Stack: Flask + Supabase PostgreSQL + Groq, all free tier."
+**"Why not use an API? It would be better quality."**
+Quality vs privacy and cost. The architecture keeps a model adapter, so a cloud backend
+can be added later without touching the retrieval code — but the default must work
+offline for confidential papers.
 
-### Closing (20 s)
-> "The test suite has 38+ automated tests, a 144-page paper is indexed in about
-> 10 seconds, and the app also runs without any API key in extractive preview
-> mode. Thank you sir — happy to take questions."
+**"What if the model gives a wrong answer?"**
+Retrieval restricts it to the paper's passages, every claim carries a page marker, and if
+the model is unavailable the app shows the retrieved excerpts instead of inventing text.
+Small models are treated as a drafting aid, not an authority.
 
----
+**"How is it different from a ChatGPT PDF plugin?"**
+Runs locally, no account/API key, no per-page upload, works offline, citations in the UI,
+open source and inspectable.
 
-## 3. Likely questions
+**"How would you scale it to a department?"**
+SQLite → PostgreSQL, loopback → authenticated LAN deployment, per-user quotas, and a
+larger model on a shared GPU box. The current build deliberately stays single-user.
 
-| Question | Suggested answer |
-|---|---|
-| What is RAG? | Retrieval-Augmented Generation — retrieve the relevant passages first, then have the LLM answer from that context only. Answers stay grounded in the document. |
-| What is the tech stack? | HTML, CSS, Bootstrap and vanilla JavaScript on the frontend; Python (Flask) at the backend; Supabase (PostgreSQL + pgvector) for the database; Groq as the LLM API. |
-| How does it reduce hallucination? | The model receives only the paper's passages and is instructed to answer strictly from them, with page citations the reader can check. |
-| How is it different from a general chatbot? | A general chatbot answers from general knowledge. This tool answers only from the uploaded paper and shows the exact page references. |
-| What are embeddings? | Fixed-length numeric vectors (384 dimensions here) that represent meaning, so similar passages can be found by cosine similarity. Default backend is feature hashing; MiniLM is supported as an option. |
-| Why Supabase? | Managed PostgreSQL with pgvector — vector search happens inside the database (HNSW index), with row-level security. Free tier is enough for this scale. |
-| What if there is no internet? | The app runs offline too: SQLite storage and an extractive preview that quotes the paper's own sentences (clearly labelled). |
-| How is security handled? | Hashed passwords (Werkzeug), signed session tokens, per-account data isolation, RLS on every table, and only a server-side service role accesses the database. |
-| What are the limitations? | No OCR for scanned PDFs yet; complex tables/figures/equations are not extracted; the scope is single-paper analysis. All listed under future enhancements. |
-| What did you build yourself? | The full stack — system design, Flask backend, RAG pipeline, frontend, database schema and the test suite. The report's implementation chapter documents each module. |
-| How would it scale? | pgvector HNSW scales with data size; Groq's paid tiers raise rate limits; file storage is already on Supabase Storage. |
-| Future scope? | OCR, multi-paper comparison, BibTeX export, email-based password reset, retrieval-quality evaluation, cloud deployment. |
-| Is it deployed? | It is deployment-ready: a Render.com blueprint (render.yaml) and a Dockerfile are included. The code is hosted on GitHub. |
+## Do not
 
----
-
-## 4. Numbers worth remembering
-
-| Item | Value |
-|---|---|
-| Tests | 38+ passing |
-| Big paper demo | 144 pages → 887 passages → ~10 s |
-| Answer time | 2–4 s |
-| Upload limit | 50 MB |
-| Cost | ₹0 (free tiers) |
-
----
-
-## 5. Common mistakes to avoid
-
-1. Trying untested changes during the demo — show only the tested flow.
-2. Speaking too fast — keep a steady pace and point at the screen.
-3. Arguing over an interruption — "That is a good question, the approach is…"
-4. If something fails: "One minute sir, I will restart the server." → `python run.py` → continue calmly.
-5. Always end the verification story with: *important claims should be verified
-   against the original paper* — that is the core design goal of the tool.
+- Do not demo on a fresh extract: the first-run download would eat the presentation time.
+- Do not claim the model is always correct; say citations let the reader verify.
+- Do not run with `HOST=0.0.0.0` on public Wi-Fi.
+- Do not delete `instance/` before the demo — that removes the uploaded PDF and summaries.

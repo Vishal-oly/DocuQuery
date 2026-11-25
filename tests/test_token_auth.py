@@ -12,9 +12,7 @@ def make_test_app(tmp_path):
         {
             "TESTING": True,
             "SECRET_KEY": "test-key",
-            "GROQ_API_KEY": "",
-            "SUPABASE_URL": "",
-            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "OLLAMA_ENABLED": False,
             "LOCAL_DB_PATH": str(tmp_path / "token.sqlite3"),
         }
     )
