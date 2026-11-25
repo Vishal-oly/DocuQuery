@@ -1,92 +1,147 @@
-# Minor Project Synopsis — DocuQuery
+# DocuQuery — Project Synopsis
 
-## Project title
-
-**DocuQuery: A Retrieval-Augmented Web Assistant for Scientific Paper PDFs**
+**Offline, on-device research assistant for scientific PDFs**
+Flask · SQLite · llama.cpp + Qwen2.5 · no cloud services
 
 ## Abstract
 
-Scientific papers contain detailed methods, results, and limitations that can be difficult to find quickly. DocuQuery is a web-based reading assistant that accepts a research-paper PDF, extracts text page by page, separates it into searchable passages, and retrieves evidence relevant to a structured research brief or a user's question. The workspace presents the brief alongside page-linked excerpts so readers can inspect the source. The interface is built with HTML, CSS, JavaScript, and Bootstrap; the backend uses Python and Flask. Groq provides optional language-model generation, while Supabase PostgreSQL with pgvector is the configured persistent store. A local SQLite mode and extractive preview support a demonstration without external credentials.
+DocuQuery lets a student or researcher upload a scientific paper, receive a structured
+research brief, and ask questions that are answered with page-level citations. The whole
+system runs on a single laptop: PDF text extraction, chunking, embeddings, vector search,
+summaries, question answering and the web interface. The language model is a quantised
+Qwen2.5 GGUF file executed locally by llama.cpp. Documents, embeddings and accounts never
+leave the machine, and the application makes no request to any third-party service after
+the one-time setup download.
 
 ## Problem statement
 
-Reading a full research article is time-consuming, and short generic summaries may hide the methodology, data, limitations, or evidence behind a claim. Readers also need to locate the source passage that supports an answer. DocuQuery addresses these needs by combining retrieval with structured generation and displaying page and section references with the results.
+Reading research papers is slow. Generic chatbots summarise papers quickly but:
+
+- they upload the document to a cloud provider, which is a problem for unpublished or
+  personal work;
+- they invent details because they answer from general knowledge, not the paper;
+- they rarely tell the reader which page supports which claim;
+- they need API keys, accounts and a stable internet connection.
+
+DocuQuery is built around the opposite constraint: the document must stay on the device,
+every claim must point back to a page, and the tool must keep working when the network is
+gone.
 
 ## Objectives
 
-1. Accept and validate scientific-paper PDF uploads.
-2. Extract selectable PDF text while preserving page numbers.
-3. Detect common scientific-paper sections and split text into overlapping passages.
-4. Create 384-dimensional passage vectors using offline feature hashing or optional MiniLM.
-5. Store paper metadata, summaries, passages, and vectors in Supabase/pgvector or local SQLite.
-6. Retrieve relevant evidence for summary fields and user questions.
-7. Generate a structured research brief and grounded answers with Groq when configured.
-8. Display source excerpts and page references in a responsive, accessible workspace.
+1. Extract text page by page from a text-based PDF and index it locally.
+2. Produce a structured brief (objective, methodology, dataset, findings, limitations,
+   conclusion) with inline page citations.
+3. Answer free-form questions through retrieval-augmented generation over the same
+   passages, again with page citations.
+4. Run entirely offline after setup, on ordinary laptop hardware, without GPU requirements.
+5. Store everything locally (SQLite + plain files) with per-account separation of papers.
+6. Degrade gracefully: if no model is available, show the closest retrieved passages
+   instead of failing.
 
-## Scope
+## System architecture
 
-The current prototype focuses on selectable text in journal-style PDFs. It provides a single-page workspace with PDF upload, a paper library for the current browser session, a research brief, an evidence trail, and question answering. It does not include user accounts, OCR, or guaranteed extraction of complex tables, figures, equations, and multi-column layouts. It is intended as a student minor-project prototype and a reading aid, not as a replacement for checking the source article.
-
-## Proposed workflow
-
-```text
-Research PDF
-   ↓
-File validation and page-wise text extraction
-   ↓
-Scientific-section detection and overlapping chunking
-   ↓
-384-dimensional vectors (feature hashing; optional MiniLM)
-   ↓
-Supabase pgvector or local SQLite storage
-   ↓
-Relevant page- and section-linked passage retrieval
-   ↓
-Groq structured brief / grounded answer
-   ↓
-Research brief, answer, and evidence trail in the DocuQuery workspace
+```
+Browser (127.0.0.1:5000)
+   │
+   ├── Flask app  ── routes/API, sessions, validation
+   │     ├── pdf_processing.py   PDF text + page + section extraction
+   │     ├── embeddings.py       hashing vectoriser (offline, no model)
+   │     ├── repository.py       SQLite: users, papers, chunks, summaries, chat
+   │     ├── storage.py          original PDFs on disk (instance/uploads/…)
+   │     ├── rag.py              retrieval, prompting, extractive fallback
+   │     └── llm.py              Ollama or any OpenAI-compatible local server
+   │
+   └── llama.cpp server (127.0.0.1:8080)  Qwen2.5 GGUF, started by local_ai.py
 ```
 
-## Main modules
+`local_ai.py` prepares the runtime and model on first use, picks a model that suits the
+laptop's RAM, starts the model server, launches the web app, and hot-swaps the model when
+a different one is chosen on the Profile page.
 
-- **Web workspace:** PDF upload, research brief, evidence trail, paper chat, and session paper library.
-- **Flask routes:** health status, upload, paper list/load/delete, and question-answer API.
-- **PDF processor:** file validation, page extraction, section detection, and chunk creation.
-- **Embedding adapter:** deterministic offline feature hashing by default; optional Sentence Transformers MiniLM.
-- **Repository layer:** Supabase/pgvector persistence with a local SQLite development fallback.
-- **RAG service:** relevant-passage retrieval, structured-summary context, answer context, and citation formatting.
-- **Groq adapter:** structured research briefs and source-grounded answers; a clearly labelled extractive/retrieval preview works without a Groq key.
+## Modules
 
-## Technology stack
+| Module | Responsibility |
+| --- | --- |
+| `docuquery/__init__.py` | application factory, blueprints, security headers, CORS policy |
+| `docuquery/config.py` | environment-driven configuration with safe local defaults |
+| `docuquery/routes.py` | pages, auth API, upload, summary, ask, model picker, health |
+| `docuquery/pdf_processing.py` | page-aware text extraction, section detection, chunking |
+| `docuquery/embeddings.py` | deterministic hashing embeddings (optional sentence-transformers) |
+| `docuquery/repository.py` | SQLite schema, account scoping, vector search, history |
+| `docuquery/storage.py` | local PDF storage with path-traversal protection |
+| `docuquery/rag.py` | retrieval, context formatting, extractive fallback |
+| `docuquery/llm.py` | local model adapters, JSON summary parsing, length presets |
+| `docuquery/model_registry.py` | model discovery, RAM-based recommendation, saved choice |
+| `local_ai.py` | runtime/model download, server lifecycle, supervision, hot swap |
 
-| Layer | Technology |
-|---|---|
-| Frontend | HTML5, CSS3, JavaScript, Bootstrap 5 |
-| Backend | Python, Flask |
-| PDF processing | pypdf |
-| Text embeddings | Feature hashing; optional Sentence Transformers MiniLM |
-| Vector database | Supabase PostgreSQL + pgvector |
-| Local development store | SQLite |
-| Language model | Groq Chat Completions |
-| Testing | pytest, Flask test client |
+## Technology stack (and why)
 
-## Testing plan
+| Choice | Reason |
+| --- | --- |
+| Flask | small, readable, easy to run locally; no server infrastructure needed |
+| SQLite | file database, zero configuration, keeps per-user data on the laptop |
+| PyPDF | pure-Python text extraction with page boundaries |
+| Hashing embeddings | no second model download; deterministic and fast for a single document set |
+| llama.cpp + Qwen2.5 GGUF (0.5B/1.5B/3B) | runs on CPU, quantised to keep the download ~0.4–2 GB |
+| Vanilla JS + local CSS | no CDN, so the interface works offline |
 
-- Confirm deterministic, normalized embedding vectors.
-- Test section detection, page-aware chunk creation, and overlap boundaries.
-- Reject invalid/non-PDF uploads and enforce the configured upload limit.
-- Test local-storage ranking, paper/session isolation, and deletion.
-- Smoke-test the web workspace, health endpoint, PDF upload, research brief, and Q&A endpoints.
-- When configured, run an end-to-end check against a Supabase project and Groq API key.
+Removed in the offline version: Groq API, Supabase (database/storage/auth) and Google
+Sign-In. See [OFFLINE_PRIVACY.md](OFFLINE_PRIVACY.md).
 
-## Expected outcome
+## Data flow
 
-A reader can upload or reopen a scientific paper, receive a structured brief, inspect page-linked evidence, ask a follow-up question, and revisit papers in the same browser session. Supabase offers managed persistent storage when configured; the SQLite mode supports a local demonstration. The included synthetic sample PDF can be used to test the main flow without relying on a real publication.
+1. **Upload** — the PDF is validated, stored under `instance/uploads/<paper-id>/`, parsed
+   page by page, split into passages and embedded.
+2. **Summary** — the most relevant passages for six research questions are retrieved and
+   sent to the local model with a strict JSON schema; the reply is validated and stored
+   with the page markers used as evidence.
+3. **Question** — the question is embedded, the closest passages are retrieved, and the
+   model answers with citations. Length is chosen in the chat box (Short/Balanced/Detailed).
+4. **Evidence** — the UI shows the page chips, and clicking one opens the original PDF at
+   that page.
 
-## Limitations and future improvements
+## Privacy properties
 
-- Add OCR for scanned PDFs and improve extraction for tables, figures, equations, and multi-column text.
-- Evaluate retrieval quality on a labelled set of papers and questions; compare feature hashing with MiniLM and add reranking if useful.
-- Add authentication and per-user access controls before public deployment.
-- Add multi-paper comparison, citation export, and downloadable brief reports.
-- Treat model-generated content as assistance only and verify claims against the original source.
+- No cloud database, bucket, model API or OAuth provider.
+- Only `127.0.0.1` sockets; proxy settings are ignored for model calls.
+- No analytics, telemetry, external fonts or CDN assets.
+- The single outbound connection in the project's lifetime is the first-run download
+  (PyPI packages, llama.cpp binaries, GGUF model).
+
+Details and verification steps: [OFFLINE_PRIVACY.md](OFFLINE_PRIVACY.md).
+
+## Performance notes
+
+| Model | Typical CPU speed | Use |
+| --- | --- | --- |
+| Qwen2.5 0.5B | 20–40 tokens/s | quick lookups, low-RAM laptops |
+| Qwen2.5 1.5B | 8–15 tokens/s | default for 8 GB laptops |
+| Qwen2.5 3B | 4–8 tokens/s | 16 GB laptops, better prose |
+
+A `--gpu` flag switches to a Vulkan build of llama.cpp for 2–5× faster answers on
+integrated or discrete GPUs. Shortening the retrieved context (`RAG_TOP_K`,
+`SUMMARY_CONTEXT_CHARS`) also cuts answer time.
+
+## Limitations
+
+- Text-based PDFs only; scanned documents need OCR first.
+- Small models can misread numbers or cite the wrong page; citations must be checked.
+- Accounts are local and intentionally simple (no email verification, no 2FA).
+- Files are unencrypted on disk; rely on OS disk encryption for a shared laptop.
+- Designed for one user on one machine, bound to loopback.
+
+## Future work
+
+- Optional OCR pipeline for scanned PDFs.
+- Cross-paper search and comparison within one account.
+- Encrypted local database and optional app-level passphrase.
+- Export a brief to Markdown/PDF for submission.
+- Streaming answers so long responses appear progressively.
+
+## References
+
+- Lewis et al., *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*, 2020.
+- Qwen Team, *Qwen2.5 Technical Report*, 2024.
+- llama.cpp project documentation (ggml-org/llama.cpp).
+- Flask and SQLite documentation.

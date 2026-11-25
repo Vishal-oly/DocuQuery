@@ -15,40 +15,6 @@
   }
 
   // ------------------------------------------------------------------
-  // Google Sign-In (Google Identity Services ID-token callback)
-  // ------------------------------------------------------------------
-  window.onGoogleCredential = async (response) => {
-    try {
-      const result = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response && response.credential }),
-      });
-      const payload = await result.json().catch(() => ({}));
-      if (!result.ok) {
-        const alertBox = document.querySelector('#authAlert');
-        if (alertBox) {
-          alertBox.textContent = payload.error || `Google sign-in failed (${result.status}).`;
-          alertBox.classList.remove('success');
-          alertBox.hidden = false;
-        }
-        return;
-      }
-      if (payload.token && window.DQAuth) window.DQAuth.setToken(payload.token);
-      const next = (window.DOCUQUERY_AUTH && window.DOCUQUERY_AUTH.next) || '';
-      const target = next && next.startsWith('/') ? next : '/workspace';
-      window.location.href = window.DQAuth ? window.DQAuth.withToken(target) : target;
-    } catch (error) {
-      const alertBox = document.querySelector('#authAlert');
-      if (alertBox) {
-        alertBox.textContent = `Google sign-in failed: ${error.message}`;
-        alertBox.classList.remove('success');
-        alertBox.hidden = false;
-      }
-    }
-  };
-
-  // ------------------------------------------------------------------
   // Forgot-password page (two-step: request code → reset password)
   // ------------------------------------------------------------------
   const forgotForm = $('#forgotForm');
@@ -176,16 +142,6 @@
   const authSubtitle = $('#authSubtitle');
   const authSubmit = $('#authSubmit');
   const authSwitch = $('#authSwitch');
-
-  const toast = $('#toast');
-  let toastTimer = null;
-  function showToast(message) {
-    if (!toast) return;
-    toast.textContent = message;
-    toast.hidden = false;
-    window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => { toast.hidden = true; }, 3600);
-  }
 
   function setAlert(message, kind = 'error') {
     authAlert.textContent = message;

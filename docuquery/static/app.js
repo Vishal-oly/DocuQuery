@@ -256,7 +256,7 @@
     formData.append('pdf', file);
     setUploading(true);
     try {
-      const payload = await api('/api/upload', { method: 'POST', body: formData });
+      const payload = await api('/api/upload', { method: 'POST', body: formData, timeoutMs: 300000 });
       chatMessages.replaceChildren();
       setPaper(payload.paper, payload.chunk_count);
       const mode = payload.summary && payload.summary.mode ? payload.summary.mode : 'processed';
@@ -270,6 +270,22 @@
       setUploading(false);
       pdfInput.value = '';
     }
+  }
+
+  function answerDetail() {
+    const select = $('#answerDetail');
+    const value = select ? select.value : 'balanced';
+    try { localStorage.setItem('dqAnswerDetail', value); } catch (error) { /* storage may be blocked */ }
+    return value;
+  }
+
+  function restoreAnswerDetail() {
+    const select = $('#answerDetail');
+    if (!select) return;
+    try {
+      const saved = localStorage.getItem('dqAnswerDetail');
+      if (saved && select.querySelector(`option[value="${saved}"]`)) select.value = saved;
+    } catch (error) { /* ignore */ }
   }
 
   function showTyping() {
@@ -297,7 +313,8 @@
       const payload = await api(`/api/papers/${encodeURIComponent(activePaper.id)}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: cleanQuestion }),
+        body: JSON.stringify({ question: cleanQuestion, detail: answerDetail() }),
+        timeoutMs: 300000,
       });
       $('#typingIndicator')?.remove();
       if (epoch !== chatEpoch) return; // chat was cleared while the answer was loading
@@ -398,10 +415,11 @@
     try {
       const health = await api('/api/health');
       maxUploadMb = Number(health.max_upload_mb) || 20;
-      const isSupabase = health.database === 'Supabase pgvector';
-      $('#connectionPill').dataset.mode = isSupabase ? 'supabase' : 'local';
-      $('#connectionLabel').textContent = isSupabase ? 'Supabase connected' : 'Local demo mode';
-      $('#footerStatus').textContent = health.llm_available ? `Groq ready · ${health.llm_model}` : 'Preview mode · add a Groq key for generated answers';
+      $('#connectionPill').dataset.mode = 'local';
+      $('#connectionLabel').textContent = 'Local SQLite';
+      $('#footerStatus').textContent = health.llm_available
+        ? `${health.llm_label || 'Local model'} ready · ${health.llm_model || 'default model'}`
+        : 'Preview mode · no local model is running';
       await loadLibrary();
     } catch (error) {
       $('#connectionPill').dataset.mode = 'offline';
@@ -410,5 +428,6 @@
     }
   }
 
+  restoreAnswerDetail();
   initialize();
 })();

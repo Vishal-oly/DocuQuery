@@ -1,3 +1,9 @@
+> **Updated architecture note (offline edition):** DocuQuery now runs entirely on one laptop —
+> Flask + SQLite + a local Qwen GGUF model served by llama.cpp. Groq, Supabase and Google
+> Sign-In were removed, the UI no longer loads CDN assets, and only `127.0.0.1` sockets are used.
+> Cloud-specific sections below are kept as project history. For how it works today see
+> [the offline & privacy guide](OFFLINE_PRIVACY.md) and [project synopsis](PROJECT_SYNOPSIS.md).
+
 # DocuQuery — Backend Process, Step-by-Step (Yaad Karne Wali Script)
 
 Ye document **rattne ke liye** hai. Har process ki steps numbered hain, aur har

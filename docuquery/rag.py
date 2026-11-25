@@ -52,8 +52,8 @@ def retrieve_summary_chunks(repository, embedder, session_id: str, paper_id: str
                     seen.add(identity)
                     found.append(chunk)
     except Exception:
-        # The uploaded text can still produce a fallback summary if remote vector search
-        # has not been configured yet; Q&A will surface database errors explicitly.
+        # A failed retrieval should not break the summary: the uploaded text can still
+        # produce an extractive brief. Q&A surfaces database errors explicitly.
         pass
     if not found:
         found = list(fallback_chunks[:12])
@@ -67,7 +67,10 @@ def format_context(chunks: list[dict[str, Any]], filename: str = "paper.pdf", ma
         text = _content(chunk)
         if not text:
             continue
-        header = f"[Source: {filename} | p. {_page_number(chunk)} | {_section(chunk)}]"
+        kind = str(chunk.get("kind") or "text")
+        label = {"table": "table", "formula": "equation/values"}.get(kind, "")
+        type_note = f" | {label}" if label else ""
+        header = f"[Source: {filename} | p. {_page_number(chunk)} | {_section(chunk)}{type_note}]"
         block = f"{header}\n{text}"
         remaining = max_chars - total
         if remaining <= 0:
@@ -77,6 +80,25 @@ def format_context(chunks: list[dict[str, Any]], filename: str = "paper.pdf", ma
         parts.append(block)
         total += len(block) + 2
     return "\n\n".join(parts)
+
+
+_DATA_QUESTION = re.compile(
+    r"\b(table|tables|accuracy|score|scores|result|results|number|numbers|value|values|"
+    r"equation|equations|formula|formulas|metric|metrics|percentage|percent|f1|auc|rmse)\b",
+    re.IGNORECASE,
+)
+
+
+def boost_data_chunks(question: str, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Nudge tables and equations up when the question is about numbers."""
+    if not _DATA_QUESTION.search(question or ""):
+        return chunks
+    weighted = []
+    for chunk in chunks:
+        bonus = {"table": 0.06, "formula": 0.04}.get(str(chunk.get("kind") or ""), 0.0)
+        weighted.append((float(chunk.get("similarity") or 0.0) + bonus, chunk))
+    weighted.sort(key=lambda item: item[0], reverse=True)
+    return [chunk for _score, chunk in weighted]
 
 
 def citation_sources(chunks: list[dict[str, Any]], limit: int = 8) -> list[dict[str, Any]]:
@@ -176,22 +198,21 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
     context = format_context(
         chunks,
         paper.get("filename", "paper.pdf"),
-        int(config.get("SUMMARY_CONTEXT_CHARS", 18000)),
+        int(config.get("SUMMARY_CONTEXT_CHARS", 9000)),
     )
     notice = None
     mode = "extractive preview"
     try:
         summary = generate_structured_summary(
             context,
-            config.get("GROQ_API_KEY", ""),
-            config.get("GROQ_MODEL", "openai/gpt-oss-20b"),
+            config,
         )
-        mode = "Groq RAG"
+        mode = "Local model RAG"
     except LLMError as exc:
         summary = extractive_summary(chunks)
         notice = (
-            "Showing a citation-linked extractive preview because Groq could not generate a summary. "
-            "Configure GROQ_API_KEY for the full AI summary. " + str(exc)
+            "Showing a citation-linked extractive preview because no local model generated a summary. "
+            + str(exc)
         )
     summary["mode"] = mode
     summary["notice"] = notice
@@ -199,13 +220,16 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
     return summary, sources
 
 
-def answer_question(repository, embedder, config: dict[str, Any], session_id: str, paper: dict[str, Any], question: str) -> dict[str, Any]:
+def answer_question(repository, embedder, config: dict[str, Any], session_id: str, paper: dict[str, Any], question: str, detail: str | None = None) -> dict[str, Any]:
     vector = embedder.embed([question])[0]
-    chunks = repository.search_chunks(
-        session_id,
-        paper["id"],
-        vector,
-        limit=int(config.get("RAG_TOP_K", 6)),
+    chunks = boost_data_chunks(
+        question,
+        repository.search_chunks(
+            session_id,
+            paper["id"],
+            vector,
+            limit=int(config.get("RAG_TOP_K", 4)),
+        ),
     )
     sources = citation_sources(chunks, limit=6)
     if not chunks:
@@ -215,15 +239,15 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
             "sources": [],
         }
 
-    context = format_context(chunks, paper.get("filename", "paper.pdf"), 12000)
+    context = format_context(chunks, paper.get("filename", "paper.pdf"), int(config.get("ANSWER_CONTEXT_CHARS", 12000)))
     try:
         answer = answer_from_context(
             question,
             context,
-            config.get("GROQ_API_KEY", ""),
-            config.get("GROQ_MODEL", "openai/gpt-oss-20b"),
+            config,
+            detail,
         )
-        mode = "Groq RAG"
+        mode = "Local model RAG"
     except LLMError as exc:
         best = chunks[:2]
         excerpts = [

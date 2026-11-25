@@ -12,9 +12,7 @@ def make_test_app(tmp_path):
         {
             "TESTING": True,
             "SECRET_KEY": "test-key",
-            "GROQ_API_KEY": "",
-            "SUPABASE_URL": "",
-            "SUPABASE_SERVICE_ROLE_KEY": "",
+            "OLLAMA_ENABLED": False,
             "LOCAL_DB_PATH": str(tmp_path / "papers.sqlite3"),
         }
     )
@@ -50,6 +48,7 @@ def test_landing_health_and_auth_guards(tmp_path):
     health = client.get("/api/health").get_json()
     assert health["database"] == "local SQLite demo"
     assert health["llm_available"] is False
+    assert health["llm_backend"] in {"ollama", "openai"}
 
 
 def test_workspace_login_flow_and_empty_library(tmp_path):
@@ -134,3 +133,30 @@ def test_upload_chat_and_account_scoping(tmp_path):
     removed = relogin.delete(f"/api/papers/{paper['id']}")
     assert removed.status_code == 200
     assert relogin.get("/api/papers").get_json()["papers"] == []
+
+
+def test_landing_serves_bootstrap_locally(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    assert '/static/vendor/bootstrap.min.css' in client.get('/').get_data(as_text=True)
+    assert client.get('/static/vendor/bootstrap.min.css').status_code == 200
+
+
+def test_model_picker_lists_and_saves_choice(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    monkeypatch.setenv("MODEL_SELECTION_FILE", str(tmp_path / "models" / "selected.json"))
+    client = make_test_app(tmp_path).test_client()
+
+    assert client.get("/api/models").status_code == 401
+    register_and_login(client, name="Model Fan", email="models@example.com")
+
+    payload = client.get("/api/models").get_json()
+    assert payload["recommended"] in {"small", "default", "large"}
+    assert {option["id"] for option in payload["options"]} >= {"preset:small", "preset:default"}
+    assert payload["current"]["available"] is False
+
+    selected = client.post("/api/models/select", json={"id": "preset:small"})
+    assert selected.status_code == 200
+    assert selected.get_json()["selected_id"] == "preset:small"
+    assert client.get("/api/models").get_json()["selected_id"] == "preset:small"
+
+    assert client.post("/api/models/select", json={"id": "preset:huge"}).status_code == 400

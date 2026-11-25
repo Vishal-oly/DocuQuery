@@ -156,14 +156,85 @@
     try {
       const health = await api('/api/health');
       $('#settingDatabase').textContent = health.database || '—';
-      $('#settingLlm').textContent = health.llm_available ? `${health.llm_model} (Groq ready)` : 'Preview mode (no Groq key)';
+      $('#settingLlm').textContent = health.llm_available
+        ? `${health.llm_model || 'default model'} (${health.llm_label || 'local model'} ready)`
+        : 'Preview mode (local model unavailable)';
       $('#settingEmbedding').textContent = health.embedding_backend || '—';
       $('#settingUpload').textContent = `${health.max_upload_mb || 20} MB`;
-      $('#footerStatus').textContent = health.llm_available ? `Groq ready · ${health.llm_model}` : 'Preview mode · add a Groq key for generated answers';
+      $('#footerStatus').textContent = health.llm_available
+        ? `${health.llm_label || 'Local model'} ready · ${health.llm_model || 'default model'}`
+        : 'Preview mode · no local model is running';
     } catch (error) {
       showToast(error.message);
     }
   }
+
+  let modelState = null;
+
+  function renderModels(payload) {
+    modelState = payload;
+    const ram = payload.ram_gb ? `${payload.ram_gb} GB RAM` : 'memory unknown';
+    $('#modelHardware').textContent =
+      `${ram} · recommended: ${payload.recommended_label}${payload.managed ? ' · switching is automatic' : ''}`;
+    const list = $('#modelOptions');
+    list.innerHTML = '';
+    (payload.options || []).forEach((option) => {
+      const label = document.createElement('label');
+      label.className = 'model-option';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'modelChoice';
+      radio.value = option.id;
+      radio.checked = option.id === payload.selected_id;
+      const copy = document.createElement('span');
+      copy.className = 'model-option-copy';
+      const title = document.createElement('strong');
+      title.textContent = option.label;
+      const meta = document.createElement('span');
+      const parts = [`${option.size_mb} MB`, option.source];
+      if (option.recommended) parts.push('recommended');
+      if (!option.downloaded) parts.push('downloads on first use');
+      meta.textContent = parts.join(' · ');
+      copy.append(title, meta);
+      label.append(radio, copy);
+      radio.addEventListener('change', () => { $('#modelApply').disabled = false; });
+      list.append(label);
+    });
+    $('#modelApply').disabled = true;
+    const current = payload.current || {};
+    $('#modelNote').textContent = current.available
+      ? `In use now: ${current.model || 'model'} (${current.label})`
+      : 'No model is running right now — answers will fall back to excerpts.';
+  }
+
+  async function loadModels() {
+    try {
+      renderModels(await api('/api/models'));
+    } catch (error) {
+      $('#modelHardware').textContent = 'Could not read the local model list.';
+    }
+  }
+
+  $('#modelApply').addEventListener('click', async () => {
+    const picked = document.querySelector('input[name="modelChoice"]:checked');
+    if (!picked) return;
+    $('#modelApply').disabled = true;
+    try {
+      const result = await api('/api/models/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: picked.value }),
+      });
+      $('#modelNote').textContent = result.message || 'Saved.';
+      if (result.managed) {
+        setTimeout(loadStatus, 6000);
+        setTimeout(loadModels, 6000);
+      }
+    } catch (error) {
+      $('#modelNote').textContent = error.message;
+      $('#modelApply').disabled = false;
+    }
+  });
 
   $('#nameForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -273,6 +344,7 @@
     }
     await loadFiles();
     await loadStatus();
+    await loadModels();
   }
 
   // Buttons/Enter keys work even where native form submission is blocked (sandboxed iframes).

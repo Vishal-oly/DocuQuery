@@ -20,9 +20,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
     app.extensions["paper_repository"] = repository
     app.extensions["paper_embedder"] = embedder
-    app.extensions["paper_storage"] = FileStorage(
-        app.config, getattr(repository, "client", None)
-    )
+    app.extensions["paper_storage"] = FileStorage(app.config)
     app.register_blueprint(bp)
 
     @app.after_request

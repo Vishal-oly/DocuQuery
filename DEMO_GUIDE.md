@@ -1,116 +1,96 @@
-# DocuQuery — Demo Guide
+# Demo Guide — DocuQuery (offline, on-device)
 
-Setup instructions and a short demo walkthrough.
+A 8–10 minute demo that shows the paper workflow **and** proves nothing leaves the laptop.
+Audience takeaway: *"It reads the paper on my machine, answers with page citations, and
+still works with the internet switched off."*
 
----
+## 0. One-time preparation (do this a day before)
 
-## Quick Start
+1. `start.bat` (or `python local_ai.py`) — let the model download finish once.
+2. Create an account, upload `examples/sample_scientific_article.pdf`, generate a summary
+   and ask two questions. This warms the model into RAM and proves the flow.
+3. Keep the PDF handy; a second, smaller PDF is useful as a backup.
+4. Optional: `python local_ai.py --model small` if the demo laptop is slow.
 
-**Windows (easiest):** double-click `start.bat` — or run `start.bat` in a
-terminal. It creates the environment (first run), installs dependencies and
-starts the server.
+## 1. Opening (1 minute)
 
-**Manual setup:**
-```bash
-# 1. Open the project folder
-cd DocuQuery
+Say:
 
-# 2. Create an environment and install dependencies (first time only)
-python -m venv .venv
-# Windows:   .venv\Scripts\activate
-# Mac/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+> "DocuQuery reads scientific PDFs on the laptop itself. The paper, the index and the
+> language model stay on this device. There is no cloud account, no API key and no upload
+> to a server — I'll prove that at the end by turning the internet off."
 
-# 3. Run
-python run.py
-```
+Show the landing page: the **"100% ON-DEVICE"** tag and the *Private by design* section.
 
-Open **http://127.0.0.1:5000** in the browser.
+## 2. The problem (1 minute)
 
-The `.env` file is already configured (Supabase database + Groq LLM).
-Demo account:
+> "Reading a 12-page paper takes an hour. Chatbots summarise fast but upload the PDF,
+> invent details, and rarely tell you the page a claim came from."
 
-| Field | Value |
-|---|---|
-| Email | `demo@example.com` |
-| Password | `demo123` |
-| Library | 2 sample papers pre-loaded (144-page LLM Survey + a short sample) |
+Show a summary from a generic chatbot (prepared screenshot) with no citations, then say
+DocuQuery does the same task with page-level evidence.
 
----
+## 3. Upload and summary (3 minutes)
 
-## Demo Walkthrough (5 minutes)
+1. Log in → **Workspace** → upload the sample PDF.
+2. Point at the pipeline: validated → text extracted page by page → passages indexed.
+3. Click **Generate summary** (say it takes 20–60 s on a CPU; the first run is slowest).
+4. When it appears, walk through **Objective / Methodology / Dataset / Findings /
+   Limitations / Conclusion** and highlight the `[p. 4]` style citations.
+5. Click a page chip → the original PDF opens at that page. This is the "trust" moment.
 
-1. **Login** with the demo account.
-2. **Workspace** → open *A Survey of Large Language Models* from the library.
-3. **Research Brief** → objective, dataset, methodology, findings and
-   limitations, each with page citations like `[p. 26]`.
-4. **Evidence Trail** → the exact source excerpts behind every claim, so any
-   reader can verify against the original PDF.
-5. **Ask This Paper** → try:
-   - `What is pre-training and what data is used for it?`
-   - The answer is generated only from the paper's passages and carries
-     page + section references.
-6. **Summaries page** → download the brief as `.md`, `.txt` or `.json`.
-7. **Profile** → uploaded files, password change, clear history
-   (two-step confirmation).
+## 4. Ask the paper (2 minutes)
 
-Note: the 144-page paper is indexed as 887 passages in about 10 seconds.
+1. Ask: *"What dataset was used and how large was it?"*
+2. Point at the answer plus **Evidence** chips.
+3. Change the chat length switch to **Detailed** and ask:
+   *"Summarise the limitations in detail."* — longer answer, same citations.
+4. Ask something out of scope, e.g. *"What is the population of India?"* — the app says the
+   excerpts do not contain it. This shows it is grounded, not a general chatbot.
 
----
+## 5. Switch model (1 minute, optional)
 
-## How it works (short version)
+Profile → **AI model** → show the list (0.5B / 1.5B / 3B plus models found on disk, with
+the recommendation based on RAM) → choose one → **Use selected model**.
 
-1. *Retrieval-Augmented Generation* — every answer is grounded in passages
-   retrieved from the uploaded paper, with page citations for verification.
-2. Passages are embedded as 384-dimensional vectors and searched with
-   cosine similarity (pgvector HNSW index).
-3. Stack: Flask + Supabase PostgreSQL/pgvector + Groq LLM, with a local
-   SQLite + extractive preview fallback that needs no external services.
+> "The app picked 1.5B because this laptop has 8 GB RAM. If the demo machine is slow I can
+> switch to 0.5B live; if someone has 16 GB they can use 3B for better wording."
 
----
+## 6. Privacy proof (1–2 minutes)
 
-## Key numbers
+This is the part that lands the project.
 
-| Item | Value |
-|---|---|
-| Automated tests | 38+ (pytest) |
-| 144-page paper indexing | 887 passages in ~10 s |
-| Answer latency | ~2–4 s (Groq free tier) |
-| Upload limit | 50 MB |
-| Cost | Free tier only |
+1. Turn off Wi-Fi / unplug the cable (or enable airplane mode).
+2. Reload the page and ask another question — it still answers.
+3. Open PowerShell:
+   ```powershell
+   Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -in 5000,8080 }
+   ```
+   Both rows show `127.0.0.1`.
+4. Open DevTools → Network → reload: every request is `127.0.0.1:5000`, no CDN, no fonts.
 
----
+Close with:
 
-## Troubleshooting
+> "One download at setup, then the whole system is on this laptop. That is why it is safe
+> for unpublished work."
 
-| Problem | Solution |
-|---|---|
-| Port 5000 busy | `set PORT=5001` (Windows) / `PORT=5001 python run.py` (Mac) |
-| `ModuleNotFoundError` | run `pip install -r requirements.txt` again |
-| "Server is not responding" | restart with `python run.py` |
-| No internet | rename `.env` to `.env-offline` — the app falls back to SQLite + extractive preview mode |
-| Supabase error | check `SUPABASE_URL` in `.env` |
+## Fallback plans
 
----
+| Situation | What to do |
+| --- | --- |
+| Model too slow on the demo laptop | Start with `--model small`, or demo with the summary already generated and only ask one short question |
+| Model server crashed | Restart `start.bat`, wait for "Model ready", continue. Answers fall back to retrieved passages meanwhile, which still demonstrates citations |
+| No GPU / weak CPU | Keep answers Short, avoid Detailed |
+| Projector, no audio | Everything is visual; no video needed |
+| Forgot the password | New account in 20 seconds; demo data can be re-uploaded |
 
-## Note on secrets
+## What to emphasise in questions
 
-The `.env` file contains API keys. Keep the folder private; this file is
-already excluded from git (see `.gitignore`).
-
----
-
-## Package contents
-
-```
-DocuQuery/
-├── docuquery/        ← Application (Flask backend + frontend)
-├── tests/            ← Automated test suite
-├── docs/             ← Project report (.docx), presentation (.pptx), diagrams
-├── examples/         ← Sample research papers
-├── schema/           ← Supabase SQL setup
-├── instance/         ← Local demo database (offline mode)
-├── .env              ← Pre-configured (Supabase + Groq keys)
-├── README.md         ← Full documentation
-└── run.py            ← Start command
-```
+- **Why local?** Confidential or unpublished papers, offline labs, exam halls, no API cost.
+- **Why small models?** They fit on a normal laptop; the app shows citations so the reader
+  can verify, and the model can be swapped.
+- **Why SQLite?** One file, no server, easy backup, per-account scoping.
+- **What about accuracy?** Grounded retrieval + page citations + extractive fallback; small
+  models are verified by the reader, not trusted blindly.
+- **How is it engineered?** `pdf_processing`, `repository`, `rag`, `llm`, `model_registry`,
+  `local_ai.py` supervision — see `docs/PROJECT_SYNOPSIS.md`.

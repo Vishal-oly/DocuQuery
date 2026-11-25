@@ -17,19 +17,29 @@ if errorlevel 1 (
 if not exist ".venv\Scripts\python.exe" (
     echo [1/3] First run - creating virtual environment...
     python -m venv .venv
+    if errorlevel 1 exit /b 1
 ) else (
     echo [1/3] Virtual environment found.
 )
 
-echo [2/3] Installing dependencies...
-".venv\Scripts\python.exe" -m pip install -r requirements.txt -q --disable-pip-version-check
+".venv\Scripts\python.exe" -c "import flask, dotenv, pypdf" >nul 2>nul
+if errorlevel 1 (
+    echo [2/3] Installing dependencies - internet needed on first run...
+    ".venv\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+    if errorlevel 1 (
+        pause
+        exit /b 1
+    )
+) else (
+    echo [2/3] Dependencies already installed.
+)
 
 echo [3/3] Starting DocuQuery...
+echo   First run downloads the local AI model (about 1 GB, one time only).
 echo.
 echo   Open  http://127.0.0.1:5000  in your browser
-echo   Login: demo@example.com / demo123
 echo   Stop : press Ctrl+C
 echo.
-".venv\Scripts\python.exe" run.py
+".venv\Scripts\python.exe" local_ai.py
 
 pause

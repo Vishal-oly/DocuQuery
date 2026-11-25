@@ -1,221 +1,186 @@
-# DocuQuery — Scientific Paper Research Assistant
+# DocuQuery — offline PDF research assistant
 
-DocuQuery is a student minor-project web app for reading scientific-paper PDFs. Upload or reopen a paper, get a structured research brief, inspect page-linked evidence, and ask follow-up questions grounded in retrieved passages.
+Upload a text-based research PDF, generate a structured brief, and ask questions with page references. Everything runs on your computer: Flask, PDF extraction, hashing embeddings, SQLite, and a small local language model. No API key, no account on any website, no cloud database.
 
-**Stack:** HTML, CSS, JavaScript, Bootstrap 5, Python, Flask, Supabase PostgreSQL/pgvector, Groq. A local SQLite mode and extractive preview keep the project runnable before external services are configured.
+## One-time setup
 
-## What the app does
+1. Install Python 3.10+ (on Windows tick **"Add python.exe to PATH"**).
+2. Run the app:
 
-- **Workspace:** one responsive research dashboard for a selected paper.
-- **Guest Home & Auth:** a public home page plus email/password login and registration; papers and briefs are saved to the account.
-- **Upload PDF:** browse or drag and drop a text-based PDF (20 MB default limit).
-- **Research Brief:** overview, objective, methodology, data/materials, findings, limitations, and conclusion.
-- **Evidence Trail:** retrieved excerpts retain page numbers and section labels so readers can verify claims in the original paper.
-- **Ask This Paper:** ask a focused question or use a suggested prompt; responses cite supporting pages.
-- **Paper Library:** reopen or remove papers stored for the current browser session.
-- **Storage and models:** Supabase/pgvector and Groq are configurable; SQLite, deterministic feature-hashing vectors, and an extractive/retrieval preview are available for local demonstration.
+   ```bash
+   python local_ai.py
+   ```
 
-## Workflow
+   On Windows you can double-click **`start.bat`**, which does the same thing.
 
-```text
-Research PDF
-  → Flask upload and validation
-  → PyPDF page-wise text extraction
-  → scientific-section detection and overlapping chunks
-  → 384-dimensional vectors (hashing by default; optional MiniLM)
-  → Supabase pgvector or local SQLite
-  → retrieve relevant, page-linked passages
-  → Groq research brief / grounded answer
-  → display result with an evidence trail
-```
+On the **first run** `local_ai.py` downloads and prepares everything by itself:
 
-The app is a single-page workspace. The navigation links jump to Workspace, Upload PDF, Research Brief, Evidence Trail, Ask This Paper, and Paper Library.
+- a llama.cpp CPU runtime (~25 MB) into `runtime/`
+- the **Qwen2.5 1.5B Instruct** model, Q4 quantized (~1 GB) into `models/`
+- then it starts a private model server on `127.0.0.1` and launches the web app
 
-## Run locally
+The whole download is around **1.1 GB** and happens once. Open <http://127.0.0.1:5000>, create a local account, and upload `examples/sample_scientific_article.pdf`.
 
-Python 3.10 or later is recommended.
+### If you already run a model server
 
-> **Windows shortcut:** double-click `start.bat` (or run it in a terminal) — it
-> handles steps 1–3 in one go.
+DocuQuery reuses one automatically, nothing else to configure:
 
-### 1. Create an environment and install dependencies
+- **Ollama** with the model installed (`ollama pull qwen2.5:1.5b`)
+- **LM Studio**, **Bionic**, llama.cpp or Jan with a local server started
 
-```bash
-python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-# macOS/Linux:       source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
+Force a backend with `LLM_BACKEND=ollama` or `LLM_BACKEND=openai` in `.env`.
 
-### 2. Add optional service credentials
+## Privacy
+
+See [docs/OFFLINE_PRIVACY.md](docs/OFFLINE_PRIVACY.md) for the full data-flow, the exact
+files stored on disk, and commands to verify that only `127.0.0.1` sockets are used. Short
+version: after the one-time setup download, nothing leaves the laptop — no cloud database,
+no model API, no analytics, no CDN.
+
+## Using it offline
+
+After the first run, keep the files and start the app again with `python local_ai.py` (or `start.bat`). No internet is needed: the UI ships its own CSS, PDFs stay in `instance/`, and model requests go only to `127.0.0.1`.
+
+Useful options:
 
 ```bash
-cp .env.example .env
+python local_ai.py --download-only   # prepare the runtime + model, then exit
+python local_ai.py --no-model        # start the app in preview mode
 ```
 
-- Leave Supabase fields blank for local SQLite mode.
-- Add a Groq API key to `GROQ_API_KEY` to enable generated briefs and answers. Without it, the app labels its extractive/retrieval preview clearly.
-- Set `FLASK_SECRET_KEY` to a long random value before deploying. For example: `python -c "import secrets; print(secrets.token_hex(32))"`.
-- `.env` is ignored by Git. **Never commit API keys or the Supabase service-role key.**
+### Scanned PDFs (optional OCR)
 
-The sample Groq model ID is configurable using `GROQ_MODEL`; replace it with a model enabled for your Groq account if needed.
-
-### 3. Start DocuQuery
+Text-based PDFs work out of the box. For scanned or image-only PDFs install the optional
+OCR add-on once:
 
 ```bash
-python run.py
+python -m pip install -r requirements-ocr.txt
 ```
 
-Open `http://127.0.0.1:5000`. The server binds to `0.0.0.0` for container and preview hosting.
+It adds `pypdfium2` (page rendering), `rapidocr-onnxruntime` (ONNX OCR, models bundled) and
+`pdfplumber` (tables), so no Tesseract or Poppler install is needed and everything runs
+offline. Pages without a text layer are recognised automatically; `OCR_MAX_PAGES`
+(default 20) and `OCR_ENABLED=false` control it. OCR is slower than text extraction.
 
-Use `examples/sample_scientific_article.pdf` to test the upload flow. It is a synthetic sample created for this project; its study, authors, and results are fictional. Regenerate it with:
+### Tables and equations
+
+With `pdfplumber` installed, every paper table is stored as a **Markdown table** chunk
+(`kind="table"`) instead of loose words, so questions like "what accuracy did they report?"
+retrieve the real numbers and cite the page. Symbol-heavy equations are tagged
+`kind="formula"`; when the question mentions numbers, tables or equations these chunks get a
+small retrieval boost. `TABLE_EXTRACTION=false` disables table parsing. Formulas are quoted
+as text (LaTeX is not rendered) — the model explains them in plain words.
+
+### Model choice: automatic, saved, or switched from the app
+
+On the first run DocuQuery looks at the laptop's RAM and picks a model:
+
+| RAM | Picked automatically |
+| --- | --- |
+| under 7 GB | Qwen2.5 0.5B |
+| 7–13 GB | Qwen2.5 1.5B |
+| 14 GB or more | Qwen2.5 3B |
+
+It also scans the computer for GGUF files you already downloaded, including the
+**LM Studio** library (`~/.lmstudio/models`). See what is available with:
 
 ```bash
-python examples/generate_demo_pdf.py
+python local_ai.py --list-models
 ```
 
-## Configure Supabase (optional)
-
-1. Create a Supabase project.
-2. In the Supabase SQL Editor, run [`schema/supabase.sql`](schema/supabase.sql).
-3. Set these values in `.env`:
-
-```dotenv
-SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVER_ONLY_SERVICE_ROLE_KEY
-```
-
-4. Restart Flask. The header status will indicate that Supabase is connected.
-
-The service-role key is used only by the Flask server. It must never be added to browser JavaScript. The SQL enables row-level security and limits direct table access to the server-side service role.
-
-## Deploy (free)
-
-### Render.com — recommended (full features, 50 MB uploads)
-
-1. Push this repo to your GitHub account
-2. On [render.com](https://render.com) → **New → Blueprint** → connect the repo
-   (it reads `render.yaml` automatically)
-3. Fill the prompted secrets when asked:
-   - `SUPABASE_URL` — `https://<ref>.supabase.co`
-   - `SUPABASE_SERVICE_ROLE_KEY` — Supabase → Settings → API → service_role
-   - `GROQ_API_KEY` — console.groq.com → API Keys
-   - `GOOGLE_CLIENT_ID` — optional
-4. Deploy → your app gets a `https://docuquery.onrender.com` URL
-
-Uploads up to **50 MB** work (`MAX_UPLOAD_MB`), and PDFs are kept in
-**Supabase Storage** (`SUPABASE_STORAGE_PRIMARY=true`) so they survive restarts.
-
-### Fly.io / Docker
-
-A `Dockerfile` is included — `fly launch` or any Docker host works with the
-same environment variables.
-
-### Vercel — demo only (limited)
-
-Vercel serverless caps request bodies at **4.5 MB** and has an ephemeral
-filesystem, so big PDFs and "View Document" will not work. If you only need a
-small-PDF demo, wrap `run:app` with `@vercel/python` and set the same env vars.
-
-## Optional: Google Sign-In
-
-The login page can show a **Continue with Google** button (one-tap sign-in). Google
-users are signed in instantly; first-time Google emails get an account automatically.
-
-1. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
-2. **Create Credentials** → **OAuth client ID** → Application type **Web application**
-3. Under **Authorized JavaScript origins** add your app URL(s), e.g.:
-   - `http://127.0.0.1:5000`
-   - `http://localhost:5000`
-   - your deployed/preview URL
-4. Copy the **Client ID** and set it in `.env`:
-
-```dotenv
-GOOGLE_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
-```
-
-5. Restart Flask. The button appears on `/login`. (No client secret needed — the app
-   verifies Google ID tokens server-side.)
-
-> Note: when the app is embedded in a third-party iframe, popup-based sign-in may
-> be blocked — open the app in a normal browser tab to use Google sign-in.
-
-## Optional: MiniLM embeddings
-
-The default `hashing` embedder is deterministic, offline, and lightweight. It is a baseline—not a transformer semantic model. To use the optional local Sentence Transformers model:
+Then either pass a choice, or open **Profile → AI model** in the app, pick one and
+click **Use selected model**. When the app was started by `start.bat` /
+`local_ai.py`, the model server is swapped in the background — no restart needed.
+Otherwise the choice is saved and applied on the next start.
 
 ```bash
-python -m pip install -r requirements-embeddings.txt
+python local_ai.py --model small
+python local_ai.py --model-path "C:\Users\you\.lmstudio\models\qwen\qwen.gguf"
+EXTRA_MODEL_DIRS="D:\models" python local_ai.py --list-models
 ```
 
-Then set in `.env`:
+### How long are the answers?
 
-```dotenv
-EMBEDDING_BACKEND=sentence-transformers
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+Answers default to a **balanced** length (roughly 120–250 words). The chat box has a
+length switch next to **Clear**:
+
+| Choice | Roughly | Good for |
+| --- | --- | --- |
+| Short | under 80 words | quick facts, page lookups |
+| Balanced | 120–250 words | normal questions |
+| Detailed | 300–450 words | explanations, comparing results, caveats |
+
+Set a default in `.env` with `ANSWER_DETAIL=detailed`, or cap the length with
+`ANSWER_MAX_TOKENS`. Longer answers take proportionally longer on a CPU — and small
+models drift more when asked for long text, so check the citations.
+
+### What changes with a different model?
+
+| Model | Speed on a laptop CPU | Wording | Reliable citations | Best for |
+| --- | --- | --- | --- | --- |
+| Qwen2.5 0.5B | fastest (~20–40 tok/s) | simple sentences | sometimes wrong page numbers | quick lookups, low-RAM laptops |
+| Qwen2.5 1.5B | medium (~8–15 tok/s) | coherent, structured | usually correct | default for 8 GB laptops |
+| Qwen2.5 3B | slow (~4–8 tok/s) | closest to a good assistant | best of the three | 16 GB laptops, careful reading |
+
+A **coder** model (`Qwen2.5-Coder`) is tuned for programming, so its prose about a
+research paper is noticeably weaker — prefer the plain `Instruct` models.
+
+### Choosing a model speed
+
+| Preset | Command | Notes |
+| --- | --- | --- |
+| `small` | `python local_ai.py --model small` | Qwen2.5 0.5B, ~400 MB, fastest, 2-4x quicker answers |
+| `default` | `python local_ai.py` | Qwen2.5 1.5B, ~1 GB, balanced |
+| `large` | `python local_ai.py --model large` | Qwen2.5 3B, ~2 GB, better answers, roughly 2x slower |
+
+With a GPU (even integrated Intel/AMD), use the Vulkan build for a large speed-up:
+
+```bash
+python local_ai.py --gpu
 ```
 
-The model downloads on first use. Both backends produce 384-dimensional vectors.
+Delete the `runtime/` folder first if you switch to `--gpu`, so the Vulkan build is downloaded.
 
-## Test
+You can also tune speed in `.env`: `RAG_TOP_K` (default 4), `SUMMARY_CONTEXT_CHARS` (default 9000), `LOCAL_AI_CONTEXT` (default 6144), `LOCAL_AI_THREADS`.
+
+No GPU is required, but CPU speed, RAM, and PDF size affect how fast summaries appear. If the model is missing or the server is down, DocuQuery still extracts and shows citation-linked passages instead of generated text. Scanned PDFs without selectable text need OCR before upload.
+
+## Configuration and local data
+
+Copy `.env.example` to `.env` to change settings. Highlights:
+
+| Setting | Meaning |
+| --- | --- |
+| `LLM_BACKEND` | `auto` (default), `ollama`, or `openai` (any local OpenAI-compatible server) |
+| `OLLAMA_MODEL` | model tag used when `LLM_BACKEND=ollama` |
+| `OPENAI_BASE_URL` | local server URL, e.g. `http://127.0.0.1:1234/v1` |
+| `LOCAL_AI_MODEL_URL` | use a different GGUF file for the built-in runtime |
+| `LOCAL_AI_PORT` | port for the built-in model server (default `8080`) |
+| `MAX_UPLOAD_MB` | upload limit (default 20) |
+| `FLASK_SECRET_KEY` | set a unique value for your installation |
+
+Data lives next to the app:
+
+- `instance/demo.sqlite3` — accounts, summaries, embeddings
+- `instance/uploads/<paper-id>/` — the original PDFs
+- `runtime/`, `models/` — the downloaded AI files (safe to delete to reclaim space; they download again)
+
+Back up the whole `instance/` folder while the app is stopped. Existing SQLite data keeps working. Accounts and PDFs from the old Supabase version are **not** imported automatically; create a local account and upload the PDFs again.
+
+This setup is for single-device use: keep Flask and the model server on loopback and do not expose them to your LAN or the internet.
+
+## Tests
 
 ```bash
 python -m pip install -r requirements-dev.txt
-pytest -q
+python -m pytest -q
 ```
 
-Tests cover the Flask home/health API, PDF upload, session scoping, local vector search, PDF section/chunk processing, and deterministic embeddings. Groq and Supabase credentials are not needed for the local test suite.
+Tests use temporary databases and stubbed model replies; they never download a model or call a network service.
 
-## Project structure
+## Troubleshooting
 
-```text
-DocuQuery/
-├── docuquery/                 # Flask application package
-│   ├── templates/index.html   # Single-page workspace
-│   ├── static/                # CSS and browser JavaScript
-│   ├── routes.py              # UI and JSON API endpoints
-│   ├── pdf_processing.py      # PDF extraction and chunking
-│   ├── embeddings.py          # Hashing / optional MiniLM
-│   ├── repository.py          # Supabase and SQLite persistence
-│   ├── rag.py                 # Retrieval, brief, citations, Q&A
-│   └── llm.py                 # Groq client adapter
-├── docs/                      # Navigation diagram and project notes
-├── examples/                  # Synthetic sample PDF
-├── schema/supabase.sql        # Supabase tables and vector-search RPC
-├── tests/                     # pytest test suite
-├── .env.example               # Safe configuration template
-└── run.py                     # Local entry point
-```
-
-## API overview
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/` | Guest Home page (about, features, Login/Register) |
-| `GET` | `/login` | Login / Register page |
-| `GET` | `/workspace` | Research workspace (requires sign-in) |
-| `POST` | `/api/register` | Create an account and sign in |
-| `POST` | `/api/login` | Sign in with email/password |
-| `POST` | `/api/logout` | Sign out |
-| `GET` | `/api/me` | Current signed-in user |
-| `GET` | `/api/health` | Database, model, and upload-limit status |
-| `GET` | `/api/papers` | List papers in the signed-in account |
-| `GET` | `/api/papers/<id>` | Reopen a paper and its saved brief |
-| `POST` | `/api/upload` | Validate, process, store, and summarize a PDF |
-| `POST` | `/api/papers/<id>/ask` | Retrieve evidence and answer a question |
-| `DELETE` | `/api/papers/<id>` | Remove a paper and its chunks |
-
-## Scope, privacy, and limitations
-
-- The prototype supports selectable text in PDFs; scanned/image-only PDFs require OCR, which is not included.
-- Extraction of complex tables, figures, equations, and multi-column layouts may be incomplete.
-- Accounts use email/password authentication with hashed passwords; papers are scoped to the signed-in account. Add rate limiting and stronger session controls before public deployment.
-- Generated summaries and answers can be wrong or incomplete. Verify important claims against the PDF and the displayed page-linked excerpts.
-- Local SQLite is intended for development/demo use. Configure Supabase for managed storage; use a hardened WSGI deployment and a strong secret key for production.
-
-## Project documents
-
-- [Minor project synopsis](docs/PROJECT_SYNOPSIS.md)
-- [Navigation diagram (SVG)](docs/NAVIGATION_DIAGRAM.svg)
-- [Navigation diagram (PNG)](docs/NAVIGATION_DIAGRAM.png)
-- [Repository-pattern analysis](docs/REPO_ANALYSIS.md)
+- **"The local model server did not start"** — look at `logs/local-ai.log`. The last lines show the actual reason.
+- **Antivirus blocks the downloaded runtime** — allow `runtime/llama/llama-server.exe`, or use LM Studio instead.
+- **Download fails on a restricted network** — use LM Studio/Ollama and set `LLM_BACKEND=openai` or `ollama` in `.env`.
+- **Port already in use** — run with `PORT=5001 python local_ai.py`.
