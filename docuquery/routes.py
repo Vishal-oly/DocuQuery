@@ -468,6 +468,29 @@ def api_download_model():
     return jsonify({"ok": True, "status": status}), 202
 
 
+@bp.post("/api/models/download-url")
+@api_login_required
+def api_download_model_url():
+    """Save any GGUF the person links to, inside the app's models folder."""
+    from .model_registry import start_custom_download
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        status = start_custom_download(str(payload.get("url") or ""))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "status": status}), 202
+
+
+@bp.post("/api/models/reveal")
+@api_login_required
+def api_reveal_models():
+    """Open the models folder so a .gguf can be dropped in by hand."""
+    from .model_registry import reveal_models_dir
+
+    return jsonify(reveal_models_dir())
+
+
 @bp.get("/api/models/download")
 @api_login_required
 def api_download_status():

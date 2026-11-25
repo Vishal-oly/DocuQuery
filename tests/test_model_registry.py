@@ -163,3 +163,93 @@ def test_display_label_strips_paths():
     assert model_registry._display_label("C:\\Users\\Vishal\\Downloads\\qwen.gguf") == "qwen"
     assert model_registry._display_label("Qwen2.5 1.5B Instruct") == "Qwen2.5 1.5B Instruct"
     assert model_registry._display_label("") == ""
+
+
+class _HeaderResponse:
+    def __init__(self, payload: bytes, headers: dict[str, str] | None = None):
+        self._payload = payload
+        self._pos = 0
+        self.headers = {"Content-Length": str(len(payload))}
+        self.headers.update(headers or {})
+
+    def read(self, size: int = -1) -> bytes:
+        if self._pos >= len(self._payload):
+            return b""
+        end = len(self._payload) if size < 0 else self._pos + size
+        chunk = self._payload[self._pos:end]
+        self._pos = end
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_link_download_saves_gguf_and_selects_it(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    monkeypatch.setenv("MODEL_SELECTION_FILE", str(tmp_path / "models" / "selected.json"))
+    payload = b"GGUF" + b"\0" * (2 * 1024 * 1024)
+
+    path = model_registry.download_custom(
+        "https://huggingface.co/acme/tiny/resolve/main/Tiny-Q4_K_M.gguf",
+        opener=lambda request, timeout=60: _HeaderResponse(payload),
+    )
+    assert path.name == "Tiny-Q4_K_M.gguf"
+    assert path.parent == tmp_path / "models"
+    assert path.stat().st_size == len(payload)
+    assert not list((tmp_path / "models").glob("*.part"))
+
+
+def test_link_download_uses_name_from_the_server(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    path = model_registry.download_custom(
+        "https://example.test/download?id=7",
+        opener=lambda request, timeout=60: _HeaderResponse(
+            b"GGUF" + b"\0" * (1024 * 1024),
+            {"Content-Disposition": 'attachment; filename="My Model.gguf"'},
+        ),
+    )
+    assert path.name == "My Model.gguf"
+
+
+def test_link_download_rejects_html_and_missing_scheme(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    with pytest.raises(OSError) as html_error:
+        model_registry.download_custom(
+            "https://example.test/page.gguf",
+            opener=lambda request, timeout=60: _HeaderResponse(b"<html>not a model</html>"),
+        )
+    assert "not a GGUF model file" in str(html_error.value)
+    assert not list(tmp_path.glob("*.gguf")), "a rejected download must leave nothing behind"
+
+    for bad in ("ftp://example.test/m.gguf", "file:///etc/passwd", "example.test/m.gguf", ""):
+        with pytest.raises(ValueError):
+            model_registry.download_custom(bad, opener=lambda request, timeout=60: None)
+
+
+def test_link_download_keeps_the_file_inside_the_models_folder(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    path = model_registry.download_custom(
+        "https://example.test/../../evil.gguf",
+        opener=lambda request, timeout=60: _HeaderResponse(b"GGUF" + b"\0" * (1024 * 1024)),
+    )
+    assert path.parent == tmp_path / "models"
+
+
+def test_describe_reports_folder_and_free_space(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    info = model_registry.describe({"OLLAMA_ENABLED": False, "LLM_BACKEND": "ollama"})
+    assert info["models_dir"] == str(tmp_path / "models")
+    assert info["free_space_mb"] > 0

@@ -274,3 +274,46 @@ def test_answer_bubbles_always_show_the_mode_label():
     # The mode element must not sit in an `else if` that sources can skip.
     marker = app_js.index("if (role === 'assistant' && mode)")
     assert "else if (role === 'assistant' && mode)" not in app_js[marker - 80: marker + 40]
+
+
+def test_link_download_and_folder_routes(tmp_path, monkeypatch):
+    """The Profile page can pull any GGUF by link and open the models folder."""
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "models"))
+    started = {}
+
+    def fake_start(url):
+        started["url"] = url
+        return {"state": "downloading", "id": "custom", "label": "Linked model"}
+
+    app = make_test_app(tmp_path)
+    anonymous = app.test_client()
+    assert anonymous.post("/api/models/download-url", json={"url": "https://x/m.gguf"}).status_code == 401
+
+    client = app.test_client()
+    register_and_login(client, email="linker@example.com")
+    login = client.post("/api/login", json={"email": "linker@example.com", "password": "secret123"})
+    headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+
+    # Validation happens before any network call, so this never touches the internet.
+    bad = client.post("/api/models/download-url", json={"url": "ftp://x/m.gguf"}, headers=headers)
+    assert bad.status_code == 400
+    assert "http://" in bad.get_json()["error"]
+
+    monkeypatch.setattr(model_registry, "start_custom_download", fake_start)
+    ok = client.post(
+        "/api/models/download-url",
+        json={"url": "https://huggingface.co/a/b/resolve/main/Model.gguf"},
+        headers=headers,
+    )
+    assert ok.status_code == 202
+    assert started["url"].endswith("Model.gguf")
+
+    reveal = client.post("/api/models/reveal", headers=headers)
+    assert reveal.status_code == 200
+    assert reveal.get_json()["path"] == str(tmp_path / "models")
+
+    listed = client.get("/api/models", headers=headers).get_json()
+    assert listed["models_dir"] == str(tmp_path / "models")
+    assert "free_space_mb" in listed

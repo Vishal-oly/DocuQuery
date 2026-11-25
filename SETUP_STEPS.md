@@ -258,9 +258,19 @@ Chat card ke andar **model chip** hai (Balanced dropdown ke neeche) — usme cur
 
 - **Chip click karo** → list khulti hai: presets + laptop par pade saare GGUF files
 - **Model download bhi ho jayega** — chip mein jo preset "click to download" dikh raha hai, uspe click karo. Progress chip par dikhega (`downloading 42%`), poora hone par wahi model select ho jayega
-- **Naya model add karna hai?** koi bhi `.gguf` file `models\` folder mein daal do, phir page refresh
+- **Koi bhi doosra model chahiye (Hugging Face se)?** Profile → **AI model** → *Add another model from a link* → link paste karo → **Download**. File seedha `models\` folder mein save hoti hai aur wahi model select ho jata hai
+- **File pehle se laptop par hai?** `models\` folder mein daal do (Profile → **Open folder** button se folder khul jayega), phir page refresh — list mein aa jayega
 - **LM Studio / Ollama se download kiya hua model?** wo khud list mein aa jayega (`qwen2.5:1.5b (Ollama)` naam se) — dobara download ki zaroorat nahi
 - Kisi aur folder mein models hain? `start.bat` se pehle: `set EXTRA_MODEL_DIRS=D:\models`
+
+### Link wale model ka link kaise nikalna hai (Hugging Face)
+
+1. Hugging Face par model ka page kholo (jaise `Qwen2.5-7B-Instruct-GGUF`).
+2. **Files and versions** tab → jo `.gguf` file chahiye (naam mein `Q4_K_M` = laptop ke liye best size/quality), uske aage size par click karo.
+3. **Download** par right-click → **Copy link address**.
+4. App mein paste karo → **Download**. ~50–60% disk space extra rakho (download ke waqt `.part` file bhi rehti hai).
+
+Kaunsa size chunein: `Q4_K_M` = balanced (recommended), `Q5_K_M` = thoda better quality, zyada RAM; `Q2/Q3` = chhota, quality kam. 7B model ke liye kam se kam 8 GB RAM chahiye.
 
 ## Scanned / image PDF padhna (optional)
 

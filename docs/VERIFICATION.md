@@ -51,6 +51,21 @@ Verified three ways, because a dropdown that silently does nothing is easy to sh
 The select also got a custom chevron, brand focus ring and readable option colours,
 because the browser default rendered as a thick black box on Windows.
 
+### Bringing in any model
+
+Verified against a local HTTP server serving a stand-in GGUF (GGUF magic + 3 MB of bytes):
+
+- `POST /api/models/download-url` streams the file into `models/TinyLlama-1.1B-Chat-Q4_K_M.gguf.part`,
+  renames it on completion, and writes the choice to `selected.json`;
+- `/api/models` then reports `selected_id = file:…/TinyLlama-…gguf` and lists it as downloaded;
+- a link that returns HTML is refused with "That link is not a GGUF model file…" and leaves no file behind;
+- `ftp://`, `file://` and bare hosts are rejected before any network call; `../` in a link cannot escape
+  the models folder;
+- the low-disk check compares `Content-Length` with free space and refuses before writing gigabytes;
+- Profile shows the models folder and free space, its **Open folder** button reaches the server
+  (falls back to printing the path when no file manager exists, which is what happened in this sandbox),
+  and the browser blocks a non-link before it is sent.
+
 ## 3. Browser-level checks (real page, real JS)
 
 The workspace, summaries, profile, landing, login and forgot pages were loaded in a

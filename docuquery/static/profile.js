@@ -204,6 +204,18 @@
       list.append(label);
     });
     $('#modelApply').disabled = true;
+    const folder = $('#modelFolder');
+    if (folder) {
+      folder.textContent = payload.models_dir || 'models folder';
+      folder.title = payload.models_dir || '';
+    }
+    const space = $('#modelSpace');
+    if (space) {
+      const free = Number(payload.free_space_mb || 0);
+      space.textContent = free
+        ? `${(free / 1024).toFixed(1)} GB free in that folder. Any other .gguf you drop there appears in this list.`
+        : 'Any other .gguf you drop in that folder appears in this list.';
+    }
     const current = payload.current || {};
     $('#modelNote').textContent = current.available
       ? `In use now: ${current.model || 'model'} (${current.label})`
@@ -243,6 +255,95 @@
       $('#modelApply').disabled = false;
     }
   });
+
+  function watchDownload(note, label, onFinish) {
+    let timer = null;
+    const stop = () => {
+      if (timer !== null) window.clearInterval(timer);
+      timer = null;
+    };
+    timer = window.setInterval(async () => {
+      try {
+        const status = await api('/api/models/download');
+        if (status.state === 'downloading') {
+          const done = status.received_mb || 0;
+          const total = status.total_mb || 0;
+          const percent = status.percent === null || status.percent === undefined
+            ? `${done} MB`
+            : `${status.percent}%${total ? ` of ${total} MB` : ''}`;
+          note.textContent = `Downloading ${label} — ${percent}`;
+          return;
+        }
+        stop();
+        if (status.state === 'done') {
+          note.textContent = `${status.label || label} is saved and selected. It is listed under AI model above.`;
+          showToast(`${status.label || label} is ready.`);
+          await loadModels();
+          await loadStatus();
+        } else if (status.state === 'error') {
+          note.textContent = status.error || 'Download failed. Check your internet connection.';
+        }
+        if (onFinish) onFinish(status);
+      } catch (error) {
+        stop();
+        note.textContent = error.message;
+        if (onFinish) onFinish({ state: 'error', error: error.message });
+      }
+    }, 1500);
+    return stop;
+  }
+
+  async function startLinkDownload(url) {
+    const note = $('#modelLinkNote');
+    const input = $('#modelLinkInput');
+    const button = $('#modelLinkButton');
+    note.textContent = 'Starting the download…';
+    button.disabled = true;
+    input.disabled = true;
+    try {
+      await api('/api/models/download-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      note.textContent = 'Downloading — this needs internet only this once.';
+      input.value = '';
+      watchDownload(note, 'the model', () => { button.disabled = false; input.disabled = false; });
+    } catch (error) {
+      note.textContent = error.message;
+      button.disabled = false;
+      input.disabled = false;
+    }
+  }
+
+  const linkForm = $('#modelLinkForm');
+  if (linkForm) {
+    linkForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = $('#modelLinkInput');
+      const url = input.value.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        $('#modelLinkNote').textContent = 'Paste a link that starts with https:// — the direct .gguf file link.';
+        input.focus();
+        return;
+      }
+      startLinkDownload(url);
+    });
+  }
+
+  const revealButton = $('#modelReveal');
+  if (revealButton) {
+    revealButton.addEventListener('click', async () => {
+      try {
+        const result = await api('/api/models/reveal', { method: 'POST' });
+        $('#modelSpace').textContent = result.ok
+          ? 'Folder opened — drop any .gguf into it and reload this page.'
+          : `Open this folder yourself: ${result.path}`;
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+  }
 
   async function startModelDownload(option, id) {
     const note = $('#modelNote');

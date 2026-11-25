@@ -138,8 +138,23 @@ the chip saves the choice; `start.bat` loads it next time.
 
 Presets that are not on disk show **click to download** — clicking starts the download inside the
 app (progress is shown on the chip, `POST /api/models/download` + `GET /api/models/download`), and
-the finished model becomes the selected one. Only the built-in presets can be downloaded this way;
-the URLs come from a fixed list, never from user input.
+the finished model becomes the selected one.
+
+### Adding any other model
+
+Two ways, both end with the file inside the app's `models/` folder and the model selected:
+
+| Way | Steps |
+|---|---|
+| **From a link** (Profile → AI model → *Add another model from a link*) | Hugging Face model page → **Files** → click the `.gguf` size → **Download** → copy that link → paste it in the app → **Download** |
+| **From disk** | Profile → AI model → **Open folder** (or open `models/` yourself), drop the `.gguf` in, reload the page — it appears in the list |
+
+A linked download is streamed into `models/` as `<name>.gguf.part` and only renamed to `.gguf` when it
+finishes, so an interrupted download never looks like a working model. `POST /api/models/download-url`
+accepts `http(s)` links only, rejects anything that does not start with the GGUF magic bytes, checks
+free disk space first, and strips path separators from the file name so a link cannot write outside the
+models folder. When the app was started by `start.bat`, the supervisor notices the new selection and
+swaps the model within a couple of seconds — no restart.
 
 ### Model choice: automatic, saved, or switched from the app
 

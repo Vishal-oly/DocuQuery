@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#f7f8fc">
   <title>Profile — DocuQuery</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=30) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=30) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=31) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=31) }}" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -107,6 +107,26 @@
         <div class="model-options" id="modelOptions" role="radiogroup" aria-label="Available AI models"></div>
         <button class="btn btn-primary-soft" id="modelApply" type="button" disabled>Use selected model</button>
         <p class="profile-hint" id="modelNote" role="status"></p>
+
+        <div class="model-folder-row">
+          <span class="model-folder-label">Models are saved in</span>
+          <code id="modelFolder" class="model-folder-path">—</code>
+          <button class="btn btn-quiet" id="modelReveal" type="button">Open folder</button>
+        </div>
+        <p class="profile-hint" id="modelSpace"></p>
+
+        <form class="model-link-form" id="modelLinkForm">
+          <label class="model-link-label" for="modelLinkInput">Add another model from a link</label>
+          <div class="model-link-row">
+            <input class="model-link-input" id="modelLinkInput" type="url" inputmode="url"
+                   placeholder="https://huggingface.co/…/model.gguf" autocomplete="off" spellcheck="false">
+            <button class="btn btn-primary-soft" id="modelLinkButton" type="submit">Download</button>
+          </div>
+          <p class="profile-hint" id="modelLinkNote">
+            On Hugging Face open the model → <strong>Files</strong> → click the <code>.gguf</code> size → then
+            <strong>Download</strong> and copy that link. It is saved in the folder above and becomes your selected model.
+          </p>
+        </form>
       </section>
 
       <!-- Uploaded files -->
@@ -140,7 +160,7 @@
   </main>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='dq.js', v=30) }}" defer></script>
-  <script src="{{ url_for('static', filename='profile.js', v=30) }}" defer></script>
+  <script src="{{ url_for('static', filename='dq.js', v=31) }}" defer></script>
+  <script src="{{ url_for('static', filename='profile.js', v=31) }}" defer></script>
 </body>
 </html>

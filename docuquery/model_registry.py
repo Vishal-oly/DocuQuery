@@ -14,11 +14,14 @@ import ctypes
 import json
 import logging
 import os
+import re
+import shutil
 import subprocess
 import sys
 import threading
 import urllib.request
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 MIN_GGUF_MB = 100
@@ -302,6 +305,158 @@ def start_download(preset: str) -> dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
+# Bringing in any other GGUF: a direct link, or the folder on disk
+# ---------------------------------------------------------------------------
+
+MIN_CUSTOM_MB = 1
+SPACE_HEADROOM_MB = 250
+
+
+def free_space_mb(path: Path | None = None) -> float:
+    """Free megabytes where models are stored, so a download can be refused early."""
+    target = path or models_dir()
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        return float(round(shutil.disk_usage(target).free / (1024 * 1024)))
+    except OSError:
+        return 0.0
+
+
+def suggested_name(url: str, disposition: str = "") -> str:
+    """Turn a download link into a safe file name inside the models folder."""
+    name = ""
+    if disposition:
+        match = re.search(r"filename\*?=(?:UTF-8''|[\"'])?([^\";]+)", disposition, re.IGNORECASE)
+        if match:
+            name = unquote(match.group(1).strip())
+    if not name:
+        name = unquote(urlparse(url).path.rsplit("/", 1)[-1])
+    name = name.replace("\\", "/").rsplit("/", 1)[-1]
+    name = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" ._")
+    if not name.lower().endswith(".gguf"):
+        name += ".gguf"
+    if name == ".gguf":
+        name = "model.gguf"
+    return name[:96]
+
+
+def check_url(url: str) -> str:
+    """Only plain http(s) links to a .gguf file are accepted."""
+    text = str(url or "").strip()
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Paste a direct link that starts with http:// or https://.")
+    return text
+
+
+def download_custom(url: str, opener=None, min_mb: int = MIN_CUSTOM_MB) -> Path:
+    """Save any GGUF a person links to, straight into the models folder."""
+    url = check_url(url)
+    destination_dir = models_dir()
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    open_url = opener or urllib.request.urlopen
+    request = urllib.request.Request(url, headers={"User-Agent": "DocuQuery/offline"})
+    try:
+        response = open_url(request, timeout=60)
+    except Exception as exc:
+        LOGGER.debug("Custom model link failed: %s", exc)
+        raise OSError(
+            "Could not reach that link — check your internet connection or the address."
+        ) from exc
+
+    with response:
+        name = suggested_name(url, str(response.headers.get("Content-Disposition") or ""))
+        destination = destination_dir / name
+        total = int(response.headers.get("Content-Length") or 0)
+        free = free_space_mb(destination_dir)
+        if total and free and total / (1024 * 1024) > free - SPACE_HEADROOM_MB:
+            _set_download(state="error", error=(
+                f"Not enough disk space: this model needs about {round(total / (1024 * 1024))} MB "
+                f"and {int(free)} MB is free. Free up space or pick a smaller model."))
+            raise OSError(_DOWNLOAD["error"])
+
+        partial = destination.with_suffix(destination.suffix + ".part")
+        _set_download(state="downloading", received=0, total=total, error="")
+        received = 0
+        first = True
+        try:
+            with open(partial, "wb") as handle:
+                while True:
+                    chunk = response.read(CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    if first:
+                        first = False
+                        if not chunk.startswith(b"GGUF"):
+                            raise OSError(
+                                "That link is not a GGUF model file — open the model's "
+                                "Files tab on Hugging Face and copy the .gguf download link."
+                            )
+                    handle.write(chunk)
+                    received += len(chunk)
+                    _set_download(received=received)
+            if received < min_mb * 1024 * 1024:
+                raise OSError("The downloaded file looks too small to be a model.")
+            os.replace(partial, destination)
+        except Exception:
+            try:
+                partial.unlink()
+            except OSError:
+                pass
+            raise
+    return destination
+
+
+def start_custom_download(url: str) -> dict[str, object]:
+    """Download a linked GGUF in the background and make it the selected model."""
+    check_url(url)
+    with _DOWNLOAD_LOCK:
+        if _DOWNLOAD["state"] == "downloading":
+            raise ValueError("A model is already downloading — wait for it to finish.")
+        _DOWNLOAD.update({
+            "id": "custom",
+            "label": "Linked model",
+            "state": "downloading",
+            "received": 0,
+            "total": 0,
+            "error": "",
+        })
+
+    def worker() -> None:
+        try:
+            path = download_custom(url)
+            label = _display_label(path.name)
+            write_selection("file", str(path), label)
+            _set_download(state="done", id="custom", label=label)
+        except Exception as exc:
+            _set_download(state="error", error=str(exc))
+
+    threading.Thread(target=worker, name="download-custom", daemon=True).start()
+    return download_status()
+
+
+def reveal_models_dir() -> dict[str, object]:
+    """Open the models folder so a .gguf can simply be dropped into it."""
+    path = models_dir()
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return {"ok": False, "path": str(path), "error": str(exc)}
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False, timeout=10)
+        else:
+            subprocess.run(["xdg-open", str(path)], check=False, timeout=10,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError) as exc:
+        LOGGER.debug("Could not open the models folder: %s", exc)
+        return {"ok": False, "path": str(path), "error": "Open the folder yourself: " + str(path)}
+    return {"ok": True, "path": str(path)}
+
+
+# ---------------------------------------------------------------------------
 # Hardware recommendation
 # ---------------------------------------------------------------------------
 
@@ -370,6 +525,20 @@ def options() -> list[dict[str, object]]:
             "recommended": name == recommended,
         })
     entries.extend(scan_models())
+    selection = read_selection()
+    if selection and selection.get("kind") == "file":
+        known = {entry["id"] for entry in entries}
+        chosen = f"file:{selection['value']}"
+        if chosen not in known and Path(str(selection["value"])).is_file():
+            entries.append({
+                "id": chosen,
+                "kind": "file",
+                "label": _display_label(selection.get("label") or selection["value"]),
+                "path": str(selection["value"]),
+                "size_mb": int(Path(str(selection["value"])).stat().st_size // (1024 * 1024)),
+                "source": "selected",
+                "downloaded": True,
+            })
     return entries
 
 
@@ -442,6 +611,8 @@ def describe(config: dict[str, object] | None = None) -> dict[str, object]:
     managed = str((config or {}).get("MANAGED_MODEL", "")).lower() == "true"
     return {
         "ram_gb": ram,
+        "models_dir": str(models_dir()),
+        "free_space_mb": free_space_mb(),
         "recommended": recommend_preset(ram),
         "recommended_label": PRESETS[recommend_preset(ram)]["label"],
         "managed": managed,
