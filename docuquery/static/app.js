@@ -532,13 +532,15 @@
   /* ---- model chip: show which local model is answering, and switch it ---- */
 
   function shortModelName(label) {
-    return String(label || 'Local model')
-      .replace(/Qwen2\.5\s*/i, 'Qwen2.5 ')
-      .replace(/\s*Instruct/i, '')
-      .replace(/\s*GGUF/i, '')
-      .replace(/\s*\(not loaded\)/i, '')
-      .trim()
-      .slice(0, 26);
+    let text = String(label || 'Local model').trim();
+    // A label may arrive as a full path (LM Studio folders, downloaded files).
+    const segments = text.split(/[\\/]+/).filter(Boolean);
+    if (segments.length > 1) text = segments[segments.length - 1];
+    text = text.replace(/\.gguf$/i, '').replace(/\(not loaded\)/i, '').trim();
+    const qwen = text.match(/qwen2\.5[-_ ]?([0-9.]+b)/i);
+    if (qwen) return `Qwen2.5 ${qwen[1].toUpperCase()}`;
+    text = text.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return (text || 'Local model').slice(0, 26);
   }
 
   function renderModelMenu(payload) {

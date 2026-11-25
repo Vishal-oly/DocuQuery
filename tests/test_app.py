@@ -194,3 +194,40 @@ def test_download_routes_are_wired(tmp_path, monkeypatch):
     response = client.post("/api/models/download", json={"id": "preset:small"}, headers=headers)
     assert response.status_code == 202
     assert started["called"] == "small"
+
+
+def test_workspace_chat_form_lives_inside_the_chat_card(tmp_path):
+    """A stray </div> once pushed the composer outside the card and broke the layout."""
+    from html.parser import HTMLParser
+
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, email="layout@example.com")
+    login = client.post("/api/login", json={"email": "layout@example.com", "password": "secret123"})
+    token = login.get_json()["token"]
+    html = client.get(f"/workspace?token={token}").get_data(as_text=True)
+
+    class Tracker(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.stack: list[tuple[str, dict]] = []
+            self.parents = None
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if attrs.get("id") == "chatForm":
+                self.parents = [dict(item) for _tag, item in self.stack]
+            if tag not in {"br", "img", "input", "meta", "link", "hr", "source"}:
+                self.stack.append((tag, attrs))
+
+        def handle_endtag(self, tag):
+            for index in range(len(self.stack) - 1, -1, -1):
+                if self.stack[index][0] == tag:
+                    del self.stack[index:]
+                    return
+
+    parser = Tracker()
+    parser.feed(html)
+    assert parser.parents is not None, "composer form missing"
+    classes = [item.get("class") or "" for item in parser.parents]
+    assert any("chat-card" in value for value in classes), classes
+    assert any("side-column" in value for value in classes), classes
