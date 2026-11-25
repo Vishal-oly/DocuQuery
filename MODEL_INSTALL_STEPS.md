@@ -1,80 +1,98 @@
-# Naya model install karna — step by step
+# Installing a Model
 
-Model ek `.gguf` file hoti hai jo app ke `models\` folder me save hoti hai. **Ek baar download → phir hamesha offline chalta hai.** `start.bat` khud koi model download nahi karta; model tum app ke andar se laate ho.
+DocuQuery runs a local GGUF model on your own computer. The model is a single file that is
+stored in the `models\` folder and downloaded **once**; after that the application works
+completely offline.
+
+`start.bat` does not download a model. Models are added from inside the application, so you
+stay in control of what is fetched and when.
 
 ---
 
-## Tarika 1 — App ka apna model (sabse aasan, recommended)
+## 1. In-app presets (recommended)
 
-1. **`start.bat` double-click** karo aur window ko band mat karo (minimize kar do).
-2. Browser me kholo: **http://127.0.0.1:5000** → login karo.
-3. Top-right me apne naam par click → **Profile**.
-4. **AI model** card me list dikhegi:
-   ```
-   ○ Qwen2.5 0.5B Instruct   400 MB · built-in · recommended
-   ○ Qwen2.5 1.5B Instruct   1000 MB · built-in
-   ○ Qwen2.5 3B Instruct     2000 MB · built-in
-   ```
-5. Jo chahiye uske aage wala **gol button (radio)** select karo.
-6. Neeche **Use selected model** dabao → download turant shuru:
+1. Double-click **`start.bat`** and keep the window open (minimise it; do not close it).
+2. Open **http://127.0.0.1:5000** and sign in.
+3. Select your name in the top-right corner, then **Profile**.
+4. In the **AI model** card, choose a model from the list:
+
+   | Option | Size | Notes |
+   |---|---|---|
+   | Qwen2.5 0.5B Instruct | 400 MB | fastest, basic quality |
+   | Qwen2.5 1.5B Instruct | 1 GB | balanced — recommended starting point |
+   | Qwen2.5 3B Instruct | 2 GB | better answers, slower on CPU |
+
+5. Select the radio button next to the model you want.
+6. Press **Use selected model**. The download starts immediately and progress is shown in place:
+
    ```
    Downloading Qwen2.5 3B Instruct — 42% of 2000 MB
    ```
-7. Poora hone par line badal jayegi: **"… is saved and selected."** — aur model **apne aap start** ho jayega (10–30 second). Restart ki zaroorat nahi.
-8. Check karne ke liye chat card me model chip dekho: **`Qwen2.5 3B` · running · offline**. Footer me bhi **"Local model ready"** dikhega.
 
-> Pehla jawab hamesha slow hota hai (model RAM me load hota hai) — 20–60 second normal hai. Uske baad tez.
+7. When the download finishes, the message changes to **"… is saved and selected"** and the
+   model server starts automatically. No restart is required.
+8. Confirm the status in the chat card: the model chip should read **`Qwen2.5 3B · running · offline`**
+   and the footer should show **"Local model ready"**.
 
-### Kaunsa model chunein
+> The first answer after loading is always slower, because the model is read into memory.
+> 20–60 seconds is normal; subsequent answers are considerably faster.
 
-| Laptop RAM | Model | Size | Feel |
+### Choosing a model size
+
+| System memory | Model | Download | Expected behaviour |
 |---|---|---|---|
-| 4–6 GB | Qwen2.5 **0.5B** | ~400 MB | sabse tez, quality basic |
-| 8 GB (zyadatar laptops) | Qwen2.5 **1.5B** | ~1 GB | **best balance — isi se shuru karo** |
-| 16 GB | Qwen2.5 **3B** | ~2 GB | better answers, thoda slow |
+| 4–6 GB | Qwen2.5 0.5B | 400 MB | quickest; suitable for page lookups |
+| 8 GB | Qwen2.5 1.5B | 1 GB | best balance of speed and quality |
+| 16 GB or more | Qwen2.5 3B | 2 GB | fuller answers; noticeably slower |
 
-Disk me **2x jagah** rakho (download ke waqt `.part` file bhi banti hai): 3B ke liye ~4 GB free.
+Allow roughly twice the download size in free disk space, because the file is first written as
+`.part` and renamed on completion (3B needs about 4 GB free).
 
 ---
 
-## Tarika 2 — Hugging Face se koi bhi doosra model (link se)
+## 2. Any GGUF model from Hugging Face
 
-App kisi bhi GGUF model ko link se la sakta hai.
+The application can download any model that is published as a `.gguf` file.
 
-1. Browser me model ka page kholo, jaise:
-   `https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF`
-2. **Files and versions** tab kholo.
-3. File chuno — naam me **`Q4_K_M`** wala sabse best balance hai (jaise `qwen2.5-7b-instruct-q4_k_m.gguf`).
-4. Us file ke aage **size** (jaise `4.68 GB`) par click karo → download page khulega.
-5. **Download** button par **right-click** → **Copy link address**.
-6. App me → **Profile → AI model** → *Add another model from a link* box me link **paste** karo → **Download**.
-7. Progress wahin dikhega: `Downloading the model — 12% of 4680 MB`.
-8. Khatam hone par: **"… is saved and selected"** → model khud start.
+1. Open the model page, for example
+   `https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF`.
+2. Open the **Files and versions** tab.
+3. Choose a quantisation. `Q4_K_M` is the usual balance of size and quality
+   (for example `qwen2.5-7b-instruct-q4_k_m.gguf`).
+4. Click the **file size** next to that file (for example `4.68 GB`) to open the download page.
+5. Right-click **Download** and choose **Copy link address**.
+6. In DocuQuery, open **Profile → AI model → Add another model from a link**, paste the link
+   and press **Download**.
+7. Progress appears beneath the field: `Downloading the model — 12% of 4680 MB`.
+8. On completion the model is saved in `models\`, selected, and started automatically.
 
-| Quant | Size (7B) | Kab |
+| Quantisation | Size (7B model) | When to use |
 |---|---|---|
-| `Q4_K_M` | ~4.5 GB | **default choice** |
-| `Q5_K_M` | ~5.5 GB | thoda better, zyada RAM |
-| `Q3_K_M` | ~3.5 GB | kam space, quality kam |
+| `Q4_K_M` | ~4.5 GB | standard choice |
+| `Q5_K_M` | ~5.5 GB | slightly better quality, more memory |
+| `Q3_K_M` | ~3.5 GB | limited disk or memory, lower quality |
 
-> 7B model ke liye kam se kam **8 GB RAM** chahiye (16 GB better). 8 GB laptop pe 3B se aage mat jao — jawab dheere aur garm hoga.
+A 7B model requires at least 8 GB of memory (16 GB is comfortable). On an 8 GB laptop, a 3B
+model is the practical upper limit.
 
 ---
 
-## Tarika 3 — Model pehle se laptop me hai (dobara download nahi)
+## 3. A model that is already on your computer
 
-LM Studio / Ollama se pehle download kiya hua model app khud list kar leta hai:
+Models downloaded by other tools are detected automatically.
 
-1. **Profile → AI model** → list me neeche dekho: **"GGUF files on this laptop"** section.
-2. Wahan `qwen2.5:1.5b (Ollama)` ya LM Studio ka model dikhega → select → **Use selected model**.
+1. Open **Profile → AI model** and scroll to **"GGUF files on this laptop"**.
+2. LM Studio and Ollama models appear here (for example `qwen2.5:1.5b (Ollama)`).
+3. Select one and press **Use selected model**. Nothing is downloaded again.
 
-Manual file daalni ho:
+To add a file manually:
 
-1. Profile me **Models are saved in** ke aage path dikhta hai — **Open folder** dabao.
-2. Us folder me apni `.gguf` file **copy-paste** karo.
-3. Browser me **F5** (refresh) → list me naam aa jayega → select → **Use selected model**.
+1. In the same card, press **Open folder** next to the models path.
+2. Copy your `.gguf` file into that folder.
+3. Refresh the page (**F5**). The model appears in the list; select it and press **Use selected model**.
 
-Alag folder se padhna ho (jaise `D:\models`) to `start.bat` se pehle ek baar:
+To read models from another folder, set the variable before starting the application:
+
 ```bat
 set EXTRA_MODEL_DIRS=D:\models
 start.bat
@@ -82,43 +100,47 @@ start.bat
 
 ---
 
-## Model badalna (baad me kabhi bhi)
+## 4. Switching models later
 
-- **Chat card** me model chip (naam wala button) click karo → **Recommended presets** / **GGUF files on this laptop** list khulegi → jo chahiye uspe click.
-- Download hua model turant switch ho jata hai (kuch second ruk kar jawab dena).
-- Jo model pehle se nahi hai, uspe **"click to download"** likha hoga — click = download shuru.
+- Open the chat card and click the **model chip** to see all available models.
+- Presets that are not downloaded are labelled **"click to download"**; clicking one starts the download.
+- Models already on disk switch immediately; the server restarts in the background, so answers
+  may pause for a few seconds.
 
----
+## 5. Removing a model
 
-## Purana model hatana (disk free karna)
+1. Open **Profile → AI model** and press **Open folder**.
+2. Delete the `.gguf` file you no longer need.
+3. Refresh the page; the entry disappears from the list.
 
-1. Profile → **Open folder**.
-2. `.gguf` file delete karo (jo hatana hai).
-3. Page refresh → list se gayab. `selected.json` ko chhedne ki zaroorat nahi.
-
----
-
-## Kuch galat ho to
-
-| Dikhta kya hai | Matlab / kya karo |
-|---|---|
-| `Download failed — check your internet connection` | Net off ya link galat. Model pe dobara click karo, ya link phir copy karo |
-| `That link is not a GGUF model file` | HTML page ka link copy hua hai — Files tab se `.gguf` file ka link lo |
-| `Not enough disk space` | Jagah free karo (3B ke liye ~4 GB) |
-| Download 100% par atak gaya | `.part` file delete karo (`models\` folder) aur dobara click — poora hone par hi `.gguf` banta hai |
-| Chip: `no model yet · Profile` | Model download nahi hua / start nahi hua → Profile se download karo |
-| Jawab sirf PDF ke quotes aa rahe hain | Model load nahi hua; 20–30 second ruko, phir naya sawaal poocho |
-| Bahut slow | Chhota model (1.5B) chuno, ya `Detailed` ki jagah `Short` rakho |
+The saved selection file (`selected.json`) does not need to be edited.
 
 ---
 
-## Terminal wala raasta (optional, UI chhod kar)
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| *Download failed — check your internet connection* | Network unavailable or link expired | Click the model again, or copy the link afresh |
+| *That link is not a GGUF model file* | A web page was copied instead of the file | Open **Files** on Hugging Face and copy the `.gguf` link |
+| *Not enough disk space* | Insufficient free space for the download | Free space (about 4 GB for a 3B model) and retry |
+| Download stops at 100% | The file was not finalised | Delete the `.part` file in `models\` and download again |
+| Answers contain only PDF quotations | No model is loaded yet | Wait 20–30 seconds after the download, then ask again |
+| Chip reads *no model yet · Profile* | No model downloaded or started | Open **Profile → AI model** and download one |
+| Answers are slow | Model too large for this CPU | Choose the 1.5B model, or set the answer length to **Short** |
+
+---
+
+## Command-line reference (optional)
+
+These commands download and start a model without using the interface:
 
 ```powershell
-.venv\Scripts\python.exe local_ai.py --model small     # 0.5B  ~400 MB
-.venv\Scripts\python.exe local_ai.py --model default   # 1.5B  ~1 GB
-.venv\Scripts\python.exe local_ai.py --model large     # 3B    ~2 GB
-.venv\Scripts\python.exe local_ai.py --list-models     # kya-kya pada hai
+.venv\Scripts\python.exe local_ai.py --model small     # 0.5B   ~400 MB
+.venv\Scripts\python.exe local_ai.py --model default   # 1.5B   ~1 GB
+.venv\Scripts\python.exe local_ai.py --model large     # 3B     ~2 GB
+.venv\Scripts\python.exe local_ai.py --list-models     # list what is installed
 .venv\Scripts\python.exe local_ai.py --model-path "C:\models\my.gguf"
 ```
-Ye command model ko download + start dono karti hai. `start.bat` par koi asar nahi — wo phir bhi bina download khulta hai.
+
+`start.bat` is unaffected by these commands: it always starts without downloading a model.
