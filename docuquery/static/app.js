@@ -141,9 +141,10 @@
     if (role === 'assistant' && sources.length) {
       const sourceRow = document.createElement('div');
       sourceRow.className = 'chat-message-meta';
-      sourceRow.textContent = 'Evidence: ';
-      sources.slice(0, 4).forEach((source) => {
-        sourceRow.append(textElement('span', 'chat-source-mini', `p. ${source.page_number || 1}`));
+      sourceRow.append(textElement('span', 'meta-label', 'Evidence:'));
+      const pages = [...new Set(sources.map((source) => source.page_number || 1))].slice(0, 4);
+      pages.forEach((page) => {
+        sourceRow.append(textElement('span', 'chat-source-mini', `p. ${page}`));
       });
       message.append(sourceRow);
     } else if (role === 'assistant' && mode) {

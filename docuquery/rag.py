@@ -3,7 +3,30 @@
 import re
 from typing import Any
 
-from .llm import LLMError, answer_from_context, generate_structured_summary
+from .llm import (
+    LLMError,
+    answer_from_context,
+    generate_questions,
+    generate_structured_summary,
+)
+
+_PAGE_REF = re.compile(r"\[\s*p\.?\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]", re.IGNORECASE)
+_ANY_BRACKET = re.compile(r"\[[^\]\n]{1,24}\]")
+
+QUESTION_INTENT = re.compile(
+    r"\b(question|questions|quiz|mcq|mcqs|viva|exam|assignment|question bank|interview)\b",
+    re.IGNORECASE,
+)
+QUESTION_TRIGGER = re.compile(
+    r"\b(give|generate|make|create|suggest|list|prepare|frame|write|some|few|more|ask)\b",
+    re.IGNORECASE,
+)
+
+BROAD_QUESTION = re.compile(
+    r"\b(objective|main idea|overview|summar\w*|what is this paper|what is the paper about|"
+    r"purpose|aim|goal|introduction|abstract|in short|briefly)\b",
+    re.IGNORECASE,
+)
 
 SUMMARY_QUERIES = (
     "What research problem, objective, motivation, and contribution does the paper state?",
@@ -21,6 +44,68 @@ SUMMARY_FIELDS = {
     "limitations": ("limitation", "challenge", "future work", "threat", "however", "weakness"),
     "conclusion": ("conclusion", "conclude", "in summary", "implication", "overall"),
 }
+
+
+def sanitize_answer(text: str) -> str:
+    """Keep page citations, drop the paper's own reference numbers.
+
+    Small models happily copy bracketed numbers such as [33.31] or [28.6] out of the
+    source text, which look like citations but point nowhere. Only [p. N] survives.
+    """
+    if not text:
+        return text
+    cleaned = _ANY_BRACKET.sub(lambda match: match.group(0) if _PAGE_REF.fullmatch(match.group(0)) else "", text)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([.,;:])", r"\1", cleaned)
+    cleaned = re.sub(r"(\[\s*p\.?\s*\d+\s*\])(?:\s*\1)+", r"\1", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def wants_questions(question: str) -> bool:
+    return bool(QUESTION_INTENT.search(question or "") and QUESTION_TRIGGER.search(question or ""))
+
+
+def is_broad_question(question: str) -> bool:
+    text = (question or "").strip()
+    if len(text.split()) <= 6 and BROAD_QUESTION.search(text):
+        return True
+    return bool(BROAD_QUESTION.search(text))
+
+
+def _intro_chunks(repository, session_id: str, paper_id: str, limit: int = 4) -> list[dict[str, Any]]:
+    """Opening pages carry the objective and abstract, which embeddings often miss."""
+    try:
+        chunks = repository.list_chunks(session_id, paper_id)
+    except Exception:
+        return []
+    picked = [chunk for chunk in chunks if int(chunk.get("page_number") or 99) <= 2]
+    picked.extend(
+        chunk for chunk in chunks
+        if str(chunk.get("section") or "").lower() in {"abstract", "introduction"}
+    )
+    unique, seen = [], set()
+    for chunk in picked:
+        identity = _chunk_identity(chunk)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append({**chunk, "similarity": float(chunk.get("similarity") or 0.0)})
+    return unique[:limit]
+
+
+def _spread_chunks(repository, session_id: str, paper_id: str, limit: int = 8) -> list[dict[str, Any]]:
+    """Sample chunks evenly across the paper so generated questions cover more pages."""
+    try:
+        chunks = repository.list_chunks(session_id, paper_id)
+    except Exception:
+        return []
+    chunks = [chunk for chunk in chunks if len(str(chunk.get("content") or "")) >= 80]
+    if len(chunks) <= limit:
+        return chunks
+    step = len(chunks) / float(limit)
+    picked = [chunks[int(index * step)] for index in range(limit)]
+    return [{**chunk, "similarity": float(chunk.get("similarity") or 0.0)} for chunk in picked]
 
 
 def _page_number(chunk: dict[str, Any]) -> int:
@@ -214,6 +299,11 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
             "Showing a citation-linked extractive preview because no local model generated a summary. "
             + str(exc)
         )
+    # Summaries copy reference numbers from the paper just as answers do.
+    summary = {
+        key: sanitize_answer(value) if isinstance(value, str) else value
+        for key, value in summary.items()
+    }
     summary["mode"] = mode
     summary["notice"] = notice
     sources = citation_sources(chunks)
@@ -239,22 +329,41 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
             "sources": [],
         }
 
+    if wants_questions(question):
+        # Question generation needs breadth: sample across the whole paper, not 4 near vectors.
+        spread = _spread_chunks(repository, session_id, paper["id"])
+        known = {_chunk_identity(chunk) for chunk in chunks}
+        chunks = chunks + [c for c in spread if _chunk_identity(c) not in known]
+        sources = citation_sources(chunks, limit=6)
+
+    if is_broad_question(question):
+        # "Main objective" and friends need the opening pages, not just nearest vectors.
+        intro = _intro_chunks(repository, session_id, paper["id"])
+        known = {_chunk_identity(chunk) for chunk in chunks}
+        chunks = intro + [c for c in chunks if _chunk_identity(c) not in known]
+        sources = citation_sources(chunks, limit=6)
+
     context = format_context(chunks, paper.get("filename", "paper.pdf"), int(config.get("ANSWER_CONTEXT_CHARS", 12000)))
     try:
-        answer = answer_from_context(
-            question,
-            context,
-            config,
-            detail,
-        )
-        mode = "Local model RAG"
+        if wants_questions(question):
+            answer = generate_questions(context, config, count=int(config.get("QUESTION_COUNT", 8)))
+            mode = "Generated questions"
+        else:
+            answer = answer_from_context(
+                question,
+                context,
+                config,
+                detail,
+            )
+            mode = "Local model RAG"
+        answer = sanitize_answer(answer)
     except LLMError as exc:
         best = chunks[:2]
         excerpts = [
             f"“{_content(chunk)[:320]}” [p. {_page_number(chunk)}]"
             for chunk in best
         ]
-        answer = (
+        answer = sanitize_answer(
             f"{exc} Here are the closest retrieved passages instead of a generated answer: "
             + " ".join(excerpts)
         )

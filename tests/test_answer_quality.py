@@ -1,0 +1,101 @@
+from docuquery import rag
+
+
+def test_sanitize_drops_reference_numbers_but_keeps_pages():
+    raw = "The objective is scattering [33.31], [28.6] and phase shifts [p. 173]."
+    assert rag.sanitize_answer(raw) == "The objective is scattering, and phase shifts [p. 173]."
+
+
+def test_sanitize_collapses_duplicate_page_refs_and_spaces():
+    assert rag.sanitize_answer("A [p. 4] [p. 4] B") == "A [p. 4] B"
+    assert rag.sanitize_answer("value  ,  next") == "value, next"
+
+
+def test_question_intent_detection():
+    assert rag.wants_questions("give some questions from this pdf")
+    assert rag.wants_questions("Generate 10 MCQ questions")
+    assert rag.wants_questions("can you list exam questions?")
+    assert not rag.wants_questions("What is the main objective of this paper?")
+    assert not rag.wants_questions("What methods were used?")
+
+
+def test_broad_question_detection():
+    assert rag.is_broad_question("main objective")
+    assert rag.is_broad_question("what is this paper about?")
+    assert rag.is_broad_question("summarise the paper")
+    assert not rag.is_broad_question("what accuracy did they report on page 4?")
+
+
+class FakeRepository:
+    def __init__(self, chunks):
+        self._chunks = chunks
+
+    def list_chunks(self, session_id, paper_id):
+        return self._chunks
+
+    def search_chunks(self, session_id, paper_id, vector, limit=4):
+        return [dict(chunk, similarity=0.5) for chunk in self._chunks[:limit]]
+
+
+def _chunks(count=20):
+    return [
+        {"id": f"c{index}", "page_number": index + 1, "section": "Body",
+         "content": ("Passage number %d about quantum scattering, phase shifts and the time "
+                    "evolution of wavefunctions in one dimension." % index),
+         "kind": "text"}
+        for index in range(count)
+    ]
+
+
+def test_intro_chunks_use_first_pages_and_abstract():
+    repository = FakeRepository(_chunks())
+    intro = rag._intro_chunks(repository, "s", "p")
+    assert intro and all(int(chunk["page_number"]) <= 2 for chunk in intro)
+
+
+def test_spread_chunks_covers_the_whole_paper():
+    repository = FakeRepository(_chunks(40))
+    spread = rag._spread_chunks(repository, "s", "p", limit=8)
+    pages = [int(chunk["page_number"]) for chunk in spread]
+    assert len(pages) == 8
+    assert pages[0] == 1 and pages[-1] >= 32
+
+
+def test_answer_question_uses_question_generator(monkeypatch):
+    calls = {}
+
+    def fake_questions(context, config, count=8):
+        calls["count"] = count
+        return "1. What is the scattering phase shift? [p. 3]"
+
+    monkeypatch.setattr(rag, "generate_questions", fake_questions)
+    monkeypatch.setattr(rag, "answer_from_context", lambda *a, **k: "should not be used")
+    repository = FakeRepository(_chunks(12))
+    result = rag.answer_question(
+        repository, _FakeEmbedder(), {}, "s",
+        {"id": "p", "filename": "paper.pdf"}, "give me some questions from this pdf",
+    )
+    assert calls["count"] == 8
+    assert result["mode"] == "Generated questions"
+    assert "[p. 3]" in result["answer"]
+
+
+def test_answer_question_adds_intro_chunks_for_broad_questions(monkeypatch):
+    captured = {}
+
+    def fake_answer(question, context, config, detail=None):
+        captured["context"] = context
+        return "Objective is ... [p. 1]"
+
+    monkeypatch.setattr(rag, "answer_from_context", fake_answer)
+    repository = FakeRepository(_chunks(12))
+    rag.answer_question(
+        repository, _FakeEmbedder(), {}, "s",
+        {"id": "p", "filename": "paper.pdf"}, "main objective",
+    )
+    assert "Passage number 0" in captured["context"]
+
+
+class _FakeEmbedder:
+    def embed(self, texts):
+        return [[0.1, 0.2, 0.3] for _ in texts]

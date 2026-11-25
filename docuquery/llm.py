@@ -271,6 +271,32 @@ def answer_detail(config: dict[str, Any], detail: str | None = None) -> str:
     return choice if choice in DETAIL_STYLES else "balanced"
 
 
+def generate_questions(context: str, config: dict[str, Any], count: int = 8) -> str:
+    """Turn retrieved passages into exam-style questions the paper can answer."""
+    max_tokens = int(config.get("SUMMARY_MAX_TOKENS") or 900)
+    system = (
+        "You are an exam-setter reading a scientific paper. Write questions that the supplied "
+        "passages can actually answer. Never invent facts. After every question add the page "
+        "marker of the passage it comes from, for example [p. 12]. Cite pages only in that "
+        "form; never copy the paper's own reference numbers such as [33.31]."
+    )
+    user = f"""Write {count} questions from these paper passages.
+
+Format exactly like this:
+1. <question> [p. N]
+2. <question> [p. N]
+
+Mix the difficulty: {count - 3} short-answer questions (definitions, formulas, values, methods) and 3 longer questions (compare, explain why, derive, limitations). Do not answer the questions. Do not add an introduction or a summary at the end.
+
+Paper passages:
+{context}"""
+    return _chat(
+        config,
+        [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        max_tokens=max_tokens,
+    )
+
+
 def answer_from_context(question: str, context: str, config: dict[str, Any],
                         detail: str | None = None) -> str:
     style = answer_detail(config, detail)
@@ -278,7 +304,8 @@ def answer_from_context(question: str, context: str, config: dict[str, Any],
     max_tokens = int(config.get("ANSWER_MAX_TOKENS") or default_tokens)
     system = (
         "You answer questions about scientific papers using only the provided retrieved passages. "
-        "Do not use outside knowledge or make up claims. Cite supporting page markers like [p. 7]. "
+        "Do not use outside knowledge or make up claims. Cite supporting page markers like [p. 7] "
+        "and never copy the paper's own reference numbers such as [33.31]. "
         "Write full sentences and explain the reasoning in the passages before concluding. "
         "Some passages are Markdown tables or equations; read them carefully and state the numbers they contain. "
         "If the passages do not answer the question, say that the paper excerpts do not provide enough evidence."

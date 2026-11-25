@@ -216,8 +216,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .chat-bubble { border-radius: 11px; padding: 9px 11px; font-size: 10px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-message.user .chat-bubble { background: #6b58d7; color: #fff; border-bottom-right-radius: 4px; }
 .chat-message.assistant .chat-bubble { background: #f5f6fa; color: #4f5c73; border-bottom-left-radius: 4px; }
-.chat-message-meta { color: #a4a9b5; font-size: 8px; padding: 0 3px; }
-.chat-source-mini { display: inline-flex; margin: 3px 3px 0 0; border-radius: 4px; background: #eaf7f0; color: #438466; padding: 3px 5px; font-size: 8px; font-weight: 700; }
+.chat-message-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  color: #a4a9b5; font-size: 8px; padding: 0 3px; margin-top: 4px;
+}
+.chat-message-meta .meta-label { margin-right: 2px; }
+.chat-source-mini {
+  display: inline-flex; align-items: center; border-radius: 6px; background: #eaf7f0;
+  border: 1px solid #d5ecdf; color: #2f7a5b; padding: 3px 8px;
+  font-size: 8px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
+}
 .typing-dots { display: flex; gap: 4px; padding: 4px 2px; }
 .typing-dots span { width: 5px; height: 5px; background: #a29adf; border-radius: 50%; animation: pulse .8s infinite alternate; }
 .typing-dots span:nth-child(2) { animation-delay: .15s; }.typing-dots span:nth-child(3) { animation-delay: .3s; }

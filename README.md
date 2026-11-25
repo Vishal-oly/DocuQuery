@@ -62,6 +62,16 @@ It adds `pypdfium2` (page rendering), `rapidocr-onnxruntime` (ONNX OCR, models b
 offline. Pages without a text layer are recognised automatically; `OCR_MAX_PAGES`
 (default 20) and `OCR_ENABLED=false` control it. OCR is slower than text extraction.
 
+### Asking for questions
+
+"Give me 8 exam questions from this paper" is handled by a dedicated prompt: the app samples
+passages across the whole paper (not just the nearest four), asks the model to write
+short- and long-answer questions, and tags each with its page marker. The `Exam questions`
+chip in the chat does the same in one click. `QUESTION_COUNT` sets the default number.
+
+Answers are also cleaned up: bracketed numbers copied from the paper's own reference list
+(`[33.31]`) are removed, so only real page citations such as `[p. 173]` remain.
+
 ### Tables and equations
 
 With `pdfplumber` installed, every paper table is stored as a **Markdown table** chunk

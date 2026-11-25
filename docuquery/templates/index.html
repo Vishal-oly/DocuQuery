@@ -7,7 +7,7 @@
   <meta name="description" content="A source-grounded research paper PDF summarizer powered by retrieval-augmented generation.">
   <title>DocuQuery — Research Paper Assistant</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=15) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=16) }}" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to workspace</a>
@@ -168,10 +168,14 @@
           <div class="suggestion-area" id="suggestionArea">
             <span class="suggestion-label">TRY ASKING</span>
             <div class="suggestion-chips">
-              <button type="button" class="suggestion-chip" data-question="What is the main research question?">Main question</button>
+              <button type="button" class="suggestion-chip" data-question="What is the main objective of this paper?">Objective</button>
               <button type="button" class="suggestion-chip" data-question="What methods did the authors use?">Methods</button>
-              <button type="button" class="suggestion-chip" data-question="What are the key findings and limitations?">Findings & limits</button>
+              <button type="button" class="suggestion-chip" data-question="What dataset or data did the authors use?">Dataset</button>
+              <button type="button" class="suggestion-chip" data-question="What were the key findings?">Findings</button>
+              <button type="button" class="suggestion-chip" data-question="What limitations do the authors mention?">Limits</button>
+              <button type="button" class="suggestion-chip" data-question="Give me 8 exam questions from this paper with page references.">Exam questions</button>
             </div>
+          </div>
           </div>
           <form class="chat-form" id="chatForm">
             <label class="visually-hidden" for="chatInput">Ask a question about this paper</label>
@@ -205,7 +209,7 @@
   </main>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='dq.js', v=15) }}" defer></script>
-  <script src="{{ url_for('static', filename='app.js', v=15) }}" defer></script>
+  <script src="{{ url_for('static', filename='dq.js', v=16) }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v=16) }}" defer></script>
 </body>
 </html>
