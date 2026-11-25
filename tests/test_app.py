@@ -263,3 +263,14 @@ def test_workspace_uses_dynamic_paper_specific_suggestions(tmp_path):
     # The old one-word static chips are gone; only the three quick actions remain.
     assert 'data-question="What is the main objective of this paper?"' not in page
     assert page.count('class="suggestion-chip"') == 3
+
+
+def test_answer_bubbles_always_show_the_mode_label():
+    """Evidence chips used to hide the 'Local model' / 'Passages only' label."""
+    app_js = (Path(__file__).resolve().parents[1] / "docuquery" / "static" / "app.js").read_text()
+    styles = (Path(__file__).resolve().parents[1] / "docuquery" / "static" / "styles.css").read_text()
+    assert "'chat-message-mode'" in app_js
+    assert ".chat-message-mode" in styles
+    # The mode element must not sit in an `else if` that sources can skip.
+    marker = app_js.index("if (role === 'assistant' && mode)")
+    assert "else if (role === 'assistant' && mode)" not in app_js[marker - 80: marker + 40]

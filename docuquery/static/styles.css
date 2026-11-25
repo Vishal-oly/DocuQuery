@@ -230,6 +230,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
   color: #a4a9b5; font-size: 8px; padding: 0 3px; margin-top: 4px;
 }
 .chat-message-meta .meta-label { margin-right: 2px; }
+.chat-message-mode { color: #aeb2bd; font-size: 8px; padding: 0 3px; margin-top: 3px; letter-spacing: .2px; }
 .chat-source-mini {
   display: inline-flex; align-items: center; border-radius: 6px; background: #eaf7f0;
   border: 1px solid #d5ecdf; color: #2f7a5b; padding: 3px 8px;
@@ -416,7 +417,7 @@ body { font-size: 15px; }
 .assistant-welcome strong { font-size: 15px; }
 .assistant-welcome span { font-size: 12px; }
 .chat-bubble { font-size: 13px; }
-.chat-message-meta, .chat-source-mini { font-size: 10px; }
+.chat-message-meta, .chat-source-mini, .chat-message-mode { font-size: 10px; }
 .suggestion-label { font-size: 9px; }
 .suggestion-chip { font-size: 10px; }
 .chat-form input { font-size: 13px; }

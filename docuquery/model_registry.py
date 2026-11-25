@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -21,6 +22,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIN_GGUF_MB = 100
+
+LOGGER = logging.getLogger(__name__)
+
 
 PRESETS: dict[str, dict[str, object]] = {
     "small": {
@@ -263,9 +267,9 @@ def download_preset(preset: str, opener=None) -> Path:
                 partial.unlink()
             except OSError:
                 pass
+    LOGGER.debug("Preset download failed: %s", last_error)
     raise OSError(
-        "Download failed — check your internet connection and try again. "
-        f"(details: {last_error})"
+        "Download failed — check your internet connection, then click the model again."
     )
 
 

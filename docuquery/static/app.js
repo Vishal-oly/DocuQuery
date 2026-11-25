@@ -195,8 +195,10 @@
         }
       });
       message.append(sourceRow);
-    } else if (role === 'assistant' && mode) {
-      message.append(textElement('div', 'chat-message-meta', mode));
+    }
+    if (role === 'assistant' && mode) {
+      // Always show how the answer was produced: sources must never hide the mode label.
+      message.append(textElement('div', 'chat-message-mode', mode));
     }
     chatMessages.append(message);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -406,7 +408,9 @@
       button.type = 'button';
       button.className = 'suggestion-chip suggestion-item';
       button.dataset.question = question;
-      button.append(textElement('span', 'suggestion-icon', '↳'), textElement('span', 'suggestion-text', question));
+      const icon = textElement('span', 'suggestion-icon', '↳');
+      icon.setAttribute('aria-hidden', 'true');
+      button.append(icon, textElement('span', 'suggestion-text', question));
       list.append(button);
     });
     const hiddenCount = questions.length - visible.length;

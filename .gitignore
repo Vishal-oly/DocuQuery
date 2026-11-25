@@ -10,5 +10,8 @@ runtime/
 models/
 logs/
 
+# Local browser-harness scratch space (jsdom smoke runs)
+.uitest/
+
 # Build artifact (shared as a ZIP, not tracked)
 DocuQuery-Offline.zip
