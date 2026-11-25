@@ -66,6 +66,23 @@ Verified against a local HTTP server serving a stand-in GGUF (GGUF magic + 3 MB 
   (falls back to printing the path when no file manager exists, which is what happened in this sandbox),
   and the browser blocks a non-link before it is sent.
 
+### Start-up never downloads a model
+
+`start.bat` used to fetch the 1–2 GB preset on every run when the previous attempt had not
+finished. Now `prepare()` is called with `allow_download=False` unless the person asked for a
+model explicitly (`--model`, `--model-path`, `LOCAL_AI_PRESET`), and the supervisor accepts a
+`path of None`:
+
+- prepared output with an empty `models/` folder: `(runtime, None)` — no `ensure_model` call,
+  proven by a test that would explode if a download started;
+- `ready_selection_path()` refuses missing files, `.part` files and files below the minimum size,
+  so a half-downloaded model can never be loaded;
+- the supervisor's loop starts the model as soon as a download made *inside the app* writes the
+  selection (fake app, fake server: `started == [model]`), which is how the app goes from
+  "passages only" to "local model" without a restart;
+- with no model on disk the workspace shows "No model downloaded yet … Profile → AI model",
+  the chip reads `no model yet · Profile`, and no `start.bat` directions remain in the UI.
+
 ## 3. Browser-level checks (real page, real JS)
 
 The workspace, summaries, profile, landing, login and forgot pages were loaded in a

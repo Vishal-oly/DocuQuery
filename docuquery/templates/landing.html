@@ -7,8 +7,8 @@
   <meta name="description" content="DocuQuery — a retrieval-augmented research assistant for scientific paper PDFs. Upload a paper, get an evidence-grounded brief, and ask questions with page-linked sources.">
   <title>DocuQuery — Scientific Paper Research Assistant</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=31) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=31) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=32) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=32) }}" rel="stylesheet">
 </head>
 <body class="landing-body">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -137,7 +137,7 @@
           <p>No analytics, no telemetry, no third-party CDN and no external fonts — the interface ships its own CSS and icons.</p>
         </article>
       </div>
-      <p class="landing-privacy-note">First setup downloads the model once (~1.1 GB). After that you can unplug the internet and everything keeps working.</p>
+      <p class="landing-privacy-note">The model is downloaded once, only when you pick it inside the app. After that you can unplug the internet and everything keeps working.</p>
     </section>
 
     <!-- How it works -->
@@ -223,6 +223,6 @@
   </footer>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='auth.js', v=31) }}" defer></script>
+  <script src="{{ url_for('static', filename='auth.js', v=32) }}" defer></script>
 </body>
 </html>

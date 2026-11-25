@@ -214,6 +214,8 @@ def ensure_runtime(gpu: bool = False) -> Path | None:
 
 def model_ready(path: Path | None = None) -> bool:
     path = path or registry.preset_path(DEFAULT_PRESET)
+    if str(path).lower().endswith(".part"):
+        return False  # a download still in progress is never a usable model
     if not path.is_file() or path.stat().st_size < MIN_MODEL_BYTES:
         return False
     with path.open("rb") as handle:
@@ -257,6 +259,27 @@ def ensure_model(preset: str = DEFAULT_PRESET) -> Path:
             last_error = exc
             say(f"   that mirror failed ({exc}); trying another source if available")
     raise OSError(f"Could not download the model. Last error: {last_error}")
+
+
+def ready_selection_path(selection: dict[str, object] | None,
+                         current: Path | None = None) -> Path | None:
+    """The GGUF for a saved choice, but only if it is already on this computer.
+
+    Nothing here downloads: the app's model menu is the only place a model is
+    fetched, so starting DocuQuery can never begin a surprise 2 GB download.
+    """
+    if not selection:
+        return None
+    if selection.get("kind") == "preset":
+        path = preset_path(str(selection.get("value") or ""))
+    else:
+        value = str(selection.get("value") or "").strip()
+        path = Path(value) if value else None
+    if path is None or not model_ready(path):
+        return None
+    if current is not None and path == current:
+        return None
+    return path
 
 
 def resolve_choice(choice: dict[str, object] | None, *, allow_download: bool = True) -> Path | None:
@@ -426,14 +449,23 @@ def list_models() -> int:
     return 0
 
 
-def supervise(port: int, exe: Path, choice: dict[str, object], path: Path, gpu: bool) -> int:
-    """Run the web app and swap the model when the Profile page asks for one."""
-    server = start_server(exe, path, port, gpu=gpu)
-    if not wait_for_server(port, server):
-        say("The model server did not start; see logs/local-ai.log")
-        return 1
-    say(f"Model ready: {describe_model(choice, path)} on http://127.0.0.1:{port}/v1")
-    say("Switch models any time from the Profile page in the app.")
+def supervise(port: int, exe: Path, choice: dict[str, object] | None,
+              path: Path | None, gpu: bool) -> int:
+    """Run the web app and start or swap the model whenever one is available.
+
+    ``path`` may be ``None``: DocuQuery then opens with citation-only answers and
+    picks up the model by itself as soon as a download from the app finishes.
+    """
+    server = None
+    if path is not None:
+        server = start_server(exe, path, port, gpu=gpu)
+        if not wait_for_server(port, server):
+            say("The model server did not start; see logs/local-ai.log")
+            return 1
+        say(f"Model ready: {describe_model(choice, path)} on http://127.0.0.1:{port}/v1")
+        say("Switch models any time from the Profile page in the app.")
+    else:
+        say("No model loaded yet — waiting for one to be downloaded in the app.")
 
     os.environ["DOCUQUERY_MANAGED_MODEL"] = "true"
     os.environ["MODELS_DIR"] = str(registry.models_dir())
@@ -448,20 +480,12 @@ def supervise(port: int, exe: Path, choice: dict[str, object], path: Path, gpu: 
         while _app.poll() is None:
             time.sleep(2)
             wanted = registry.read_selection()
-            if not wanted:
-                continue
-            new_path = registry.resolve_path(wanted)
-            if new_path is None and wanted["kind"] == "preset":
-                say(f"Downloading {preset_info(str(wanted['value']))['label']} for the switch ...")
-                try:
-                    new_path = ensure_model(str(wanted["value"]))
-                except OSError as exc:
-                    say(f"Could not switch models: {exc}")
-                    continue
-            if not new_path or new_path == path:
+            new_path = ready_selection_path(wanted, path)
+            if new_path is None:
                 continue
             say("")
-            say(f"Switching to {describe_model(wanted, new_path)} ...")
+            say(("Starting " if server is None else "Switching to ")
+                + f"{describe_model(wanted, new_path)} ...")
             _stop(server)
             server, path, choice = start_server(exe, new_path, port, gpu=gpu), new_path, wanted
             if wait_for_server(port, server):
@@ -475,15 +499,13 @@ def supervise(port: int, exe: Path, choice: dict[str, object], path: Path, gpu: 
     return _app.returncode or 0
 
 
-def prepare(port: int, choice: dict[str, object] | None, gpu: bool = False) -> tuple[Path, Path] | None:
+def prepare(port: int, choice: dict[str, object] | None, gpu: bool = False,
+            allow_download: bool = False) -> tuple[Path, Path | None] | None:
+    """Return (runtime, model). The model is None when nothing is on disk yet."""
     exe = ensure_runtime(gpu)
     if not exe:
         return None
-    path = resolve_choice(choice)
-    if path is None:
-        say("That model file is missing and the preset could not be downloaded.")
-        return None
-    return exe, path
+    return exe, resolve_choice(choice, allow_download=allow_download)
 
 
 def main() -> int:
@@ -522,10 +544,13 @@ def main() -> int:
 
     port = free_port(args.port)
     if args.download_only:
-        prepared = prepare(port, choice, args.gpu)
+        prepared = prepare(port, choice, args.gpu, allow_download=True)
         return 0 if prepared else 1
 
-    prepared = prepare(port, choice, args.gpu)
+    # Only an explicit request (--model / --model-path / LOCAL_AI_PRESET) may
+    # download. A plain start.bat never fetches gigabytes on its own.
+    explicit = bool(args.model or args.model_path or os.environ.get("LOCAL_AI_PRESET", "").strip())
+    prepared = prepare(port, choice, args.gpu, allow_download=explicit)
     if not prepared:
         say("")
         say("Continuing without a model: uploads, extraction and citation previews still work.")
@@ -534,7 +559,16 @@ def main() -> int:
         return 0
 
     exe, path = prepared
-    say(f"Model selected by {origin}: {describe_model(choice, path)}")
+    if path is None:
+        say("")
+        say("No model is downloaded yet, so DocuQuery starts without one.")
+        say("In the app open Profile -> AI model and download any model there.")
+        say("It starts answering on its own as soon as the download finishes.")
+        say("")
+        if choice and choice.get("kind") == "preset":
+            say(f"Suggested for this laptop: {preset_info(str(choice['value']))['label']}")
+    else:
+        say(f"Model selected by {origin}: {describe_model(choice, path)}")
     os.environ["LLM_BACKEND"] = "openai"
     os.environ["OPENAI_BASE_URL"] = f"http://127.0.0.1:{port}/v1"
     os.environ["OPENAI_MODEL"] = ""

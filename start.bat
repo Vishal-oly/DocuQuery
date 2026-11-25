@@ -45,7 +45,8 @@ if errorlevel 1 (
 )
 
 echo [3/3] Starting DocuQuery...
-echo   First run downloads the local AI model (about 1 GB, one time only).
+echo   Models are downloaded from inside the app (Profile - AI model), one click.
+echo   Nothing big is downloaded here, so this window starts in a few seconds.
 echo.
 echo   Open  http://127.0.0.1:5000  in your browser
 echo   Stop : press Ctrl+C

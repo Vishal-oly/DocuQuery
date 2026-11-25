@@ -741,7 +741,7 @@
         if (meta) meta.textContent = 'download failed · click to retry';
         if (item) item.disabled = false;
         const chipSub = $('#modelChipSub');
-        if (chipSub) chipSub.textContent = 'not loaded · start.bat';
+        if (chipSub) chipSub.textContent = 'no model yet · Profile';
       } else {
         // Nothing in flight any more (server restarted, or the file is already here).
         stopDownloadPolling();
@@ -800,9 +800,12 @@
     }
   }
 
+  let modelPayload = null;
+
   async function refreshModelChip() {
     try {
       const payload = await api('/api/models');
+      modelPayload = payload;
       const options = payload.options || [];
       const current = options.find((option) => option.id === payload.selected_id);
       const label = (current && current.label) || (payload.current && payload.current.model) || 'Local model';
@@ -812,13 +815,13 @@
       const dot = $('#modelChipDot');
       if (chipLabel) chipLabel.textContent = shortModelName(label);
       if (chipSub) {
-        chipSub.textContent = running ? 'running · offline' : 'not loaded · start.bat';
+        chipSub.textContent = running ? 'running · offline' : 'no model yet · Profile';
       }
       if (dot) dot.dataset.state = running ? 'on' : 'off';
       const chip = $('#modelChip');
       if (chip) chip.title = running
         ? `${label} is answering your questions`
-        : `${label} is selected but not running yet — start it with start.bat`;
+        : `${label} is not loaded yet — open Profile → AI model to download or switch`;
       renderModelMenu(payload);
     } catch (error) {
       const chipLabel = $('#modelChipLabel');
@@ -836,21 +839,25 @@
       $('#footerStatus').textContent = health.llm_available
         ? `${health.llm_label || 'Local model'} ready · ${health.llm_model || 'default model'}`
         : 'Preview mode · no local model is running';
+      await refreshModelChip();
       const notice = $('#modelNotice');
       const noticeText = $('#modelNoticeText');
       if (notice && noticeText && !health.llm_available) {
         const missing = [];
         if (health.ocr_available === false) missing.push('OCR add-on');
         if (health.tables_available === false) missing.push('table reader');
-        noticeText.innerHTML = '<strong>Local model is not running yet.</strong> '
-          + 'Answers will be exact quotes from the PDF instead of written text. '
-          + 'Start it with <code>start.bat</code> (or <code>python local_ai.py</code>).'
-          + (missing.length ? ` Optional extras not installed: ${missing.join(', ')}.` : '');
+        const ready = Boolean(modelPayload)
+          && (modelPayload.options || []).some((option) => option.downloaded);
+        noticeText.innerHTML = ready
+          ? '<strong>The model is starting.</strong> Answers are exact PDF quotes for a few seconds.'
+          : '<strong>No model downloaded yet.</strong> Answers are exact quotes from your PDF. '
+            + 'Open <a href="/profile">Profile → AI model</a> and click a model to download it — '
+            + 'it starts answering on its own once the download finishes.'
+            + (missing.length ? ` Optional extras not installed: ${missing.join(', ')}.` : '');
         notice.hidden = false;
       } else if (notice) {
         notice.hidden = true;
       }
-      await refreshModelChip();
       try {
         const download = await api('/api/models/download');
         if (download.state === 'downloading' && download.id) {

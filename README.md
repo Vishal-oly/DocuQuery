@@ -18,13 +18,19 @@ and each one disappears from the list once you have asked it.
 
    On Windows you can double-click **`start.bat`**, which does the same thing.
 
-On the **first run** `local_ai.py` downloads and prepares everything by itself:
+On the **first run** `local_ai.py` prepares the small pieces by itself:
 
 - a llama.cpp CPU runtime (~25 MB) into `runtime/`
-- the **Qwen2.5 1.5B Instruct** model, Q4 quantized (~1 GB) into `models/`
-- then it starts a private model server on `127.0.0.1` and launches the web app
+- then it starts the web app at <http://127.0.0.1:5000>
 
-The whole download is around **1.1 GB** and happens once. Open <http://127.0.0.1:5000>, create a local account, and upload `examples/sample_scientific_article.pdf`.
+**Models are never downloaded behind your back.** The model (400 MB – 2 GB) is fetched
+only when *you* click one: **Profile → AI model → a preset**, or paste a Hugging Face
+`.gguf` link in the same card. Until then the app opens normally and answers with exact
+PDF quotes. As soon as a download finishes, `start.bat` starts the model server by
+itself — no restart, no console commands.
+
+You can still ask for a download up front with `python local_ai.py --model small`
+(or `default` / `large`), or download only the files with `--download-only`.
 
 ### If you already run a model server
 
@@ -126,7 +132,7 @@ The list is built from what is actually on the laptop:
 
 | Source | How it gets there |
 |---|---|
-| Built-in presets | `python local_ai.py --model small\|default\|large` downloads once |
+| Built-in presets | click one in Profile → AI model (or `python local_ai.py --model small\|default\|large`) |
 | `models/` folder | drop any `.gguf` in it |
 | **LM Studio** | its own model library is scanned automatically |
 | **Ollama** | GGUF blobs in `~/.ollama/models` are offered as `qwen2.5:1.5b (Ollama)` |
@@ -158,7 +164,7 @@ swaps the model within a couple of seconds — no restart.
 
 ### Model choice: automatic, saved, or switched from the app
 
-On the first run DocuQuery looks at the laptop's RAM and picks a model:
+DocuQuery looks at the laptop's RAM and marks the best fit (it does not download it for you):
 
 | RAM | Picked automatically |
 | --- | --- |

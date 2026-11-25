@@ -1,6 +1,6 @@
 # DocuQuery Offline — Complete Setup Guide (Hinglish)
 
-Ab kuch bhi alag se install karne ki zaroorat nahi: **model bhi app khud download kar legi**. Bas Python chahiye aur `start.bat` double-click.
+Ab kuch bhi alag se install karne ki zaroorat nahi: **model app ke andar se ek click me aa jata hai** (start.bat khud kuch bada download nahi karta). Bas Python chahiye aur `start.bat` double-click.
 
 **Download (Google Drive):** https://drive.google.com/file/d/1FuCBrrGnaK9cUAUgAhSSykFQ8-9zrIL8/view
 
@@ -11,7 +11,7 @@ Ab kuch bhi alag se install karne ki zaroorat nahi: **model bhi app khud downloa
 | Cheez | Zaroori? |
 |---|---|
 | Python 3.10+ | Haan (ek baar install) |
-| Ollama / LM Studio | **Nahi** — app khud model setup kar leti hai |
+| Ollama / LM Studio | **Nahi** — model app ke andar se ek click me download hota hai |
 | Internet | Sirf pehli baar (~1.1 GB download) |
 | Google account / API key / Supabase | Nahi, kuch bhi nahi |
 
@@ -44,23 +44,31 @@ Yaad rakho: folder ko `C:\Program Files` mein na rakho (wahan write permission n
 Folder ke andar **`start.bat`** double-click karo. Ye khud hi:
 
 1. `.venv` (virtual environment) banayega,
-2. Flask aur baaki dependencies install karega,
-3. pehli baar **AI runtime (~25 MB) + model (~1 GB)** download karega,
-4. model server start karke app chalu karega.
-
-Pehli baar total **5–15 minute** (internet speed par depend). Download progress terminal mein dikhega:
+2. Flask aur baaki dependencies install karega (pehli baar, ~2–3 minute),
+3. sirf chhota **AI runtime (~25 MB)** download karega,
+4. **model download NAHI karega** — app seedha khul jayegi.
 
 ```
 Downloading the llama.cpp runtime (b12651, about 25 MB) ...
    runtime ready (24 files)
-Downloading Qwen2.5 1.5B Instruct (about 1 GB, one time only) ...
-   model: 10% (105 MB of 1046 MB)
-   ...
-Model server ready on http://127.0.0.1:8080/v1
+
+No model is downloaded yet, so DocuQuery starts without one.
+In the app open Profile -> AI model and download any model there.
+It starts answering on its own as soon as the download finishes.
+
 DocuQuery starting at http://127.0.0.1:5000
 ```
 
-**Uske baad kabhi dobara download nahi hoga** — file `models/` folder mein save rehti hai.
+**Model tum khud laoge (ek click):** app khulne ke baad **Profile → AI model** → jo model chahiye uspe *Use selected model* dabao → download progress wahin dikhega → khatam hone par model **apne aap start** ho jayega (terminal band karne ki zaroorat nahi, restart bhi nahi). Tab tak app PDF quotes ke saath kaam karti rahegi.
+
+**Bada model barbar download nahi hoga:** adhura download `.part` file banta hai jo model ki tarah load nahi hoti; poora hone par hi `models/` mein `.gguf` ban kar save hota hai.
+
+Manual (terminal se) pehle hi download karna ho to:
+```powershell
+.venv\Scripts\python.exe local_ai.py --model small     # 0.5B, ~400 MB
+.venv\Scripts\python.exe local_ai.py --model default   # 1.5B, ~1 GB
+.venv\Scripts\python.exe local_ai.py --model large     # 3B,  ~2 GB
+```
 
 ### Windows ke bajaye macOS / Linux
 
@@ -242,7 +250,7 @@ Backup: app band karke poora **`instance`** folder copy kar lo. Purana Supabase 
 | `python is not recognized` | Python install karte waqt PATH tick nahi hua — installer → Modify → PATH add → PC restart |
 | Terminal: "The local model server did not start" | `logs/local-ai.log` ki last lines dekho; antivirus ko `runtime/llama/llama-server.exe` allow karo |
 | Download beech mein ruk gaya | `start.bat` dobara chalao — adhoora file `.part` delete karke phir se download hoga |
-| Footer: "Preview mode" | Model server band hai. Terminal band hua tha? `start.bat` dobara chalao. |
+| Footer: "Preview mode" | Koi model download/loaded nahi hai. Profile → AI model se model download karo (khud start ho jayega), ya `start.bat` dobara chalao. |
 | Summary bahut slow | Chhoti PDF se test karo, background apps band karo. Bade model (3B) se slow hoga. |
 | `Address already in use` | `PORT=5001 python local_ai.py` (PowerShell: `$env:PORT=5001; python local_ai.py`) |
 | Antivirus/SmartScreen warning | "More info → Run anyway"; ya manual commands (Step 3 ka mac/Linux wala block) |
@@ -304,7 +312,8 @@ Expected: **65 passed**. Tests koi model download ya network call nahi karte.
 
 - [ ] ZIP extract kiya
 - [ ] Python 3.10+ installed (PATH tick)
-- [ ] `start.bat` chalaya (dependencies + model download hua)
+- [ ] `start.bat` chalaya (dependencies install hue, app khuli)
+- [ ] Profile → AI model se model download kiya (ek click)
 - [ ] http://127.0.0.1:5000 khula
 - [ ] Local account banaya
 - [ ] Sample PDF ka summary generate hua

@@ -217,9 +217,12 @@
         : 'Any other .gguf you drop in that folder appears in this list.';
     }
     const current = payload.current || {};
+    const anyDownloaded = (payload.options || []).some((option) => option.downloaded);
     $('#modelNote').textContent = current.available
       ? `In use now: ${current.model || 'model'} (${current.label})`
-      : 'No model is running right now — answers will fall back to excerpts.';
+      : anyDownloaded
+        ? 'Model is downloaded but not answering yet — it starts within a few seconds of a download.'
+        : 'No model downloaded yet. Pick a preset above and press "Use selected model" to fetch it (internet needed once).';
   }
 
   async function loadModels() {
