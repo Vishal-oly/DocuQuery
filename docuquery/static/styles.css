@@ -161,8 +161,13 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .no-sources { color: #929a9a; font-size: 10px; }
 
 .side-column { display: flex; flex-direction: column; gap: 15px; }
-.chat-card { min-height: 491px; border: 1px solid #e6e7ef; border-radius: 15px; background: #fff; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
-.chat-card-header { min-height: 67px; display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid #f0f0f4; }
+.chat-card {
+  min-height: 0; max-height: calc(100vh - 24px);
+  border: 1px solid #e6e7ef; border-radius: 15px; background: #fff;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden;
+}
+@media (min-width: 992px) { .chat-card { position: sticky; top: 58px; max-height: calc(100vh - 70px); } }
+.chat-card-header { flex: 0 0 auto; min-height: 58px; display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-bottom: 1px solid #f0f0f4; }
 .chat-avatar { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 11px; background: linear-gradient(145deg, #efedff, #dff4eb); color: #6b58d7; font-size: 16px; }
 .chat-title-group { flex: 1; }
 .chat-title-group h3 { font-family: var(--font-display); font-size: 12px; font-weight: 800; margin: 0 0 3px; }
@@ -202,9 +207,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .danger-btn:hover { background: #c0392b; color: #fff; }
 .danger-btn.armed { background: #c0392b; color: #fff; border-color: #c0392b; }
 .danger-btn:disabled { opacity: .6; cursor: wait; }
-.chat-context { margin: 12px 13px 0; border-radius: 7px; background: #f8f7ff; padding: 8px 9px; color: #827cb1; display: flex; align-items: center; gap: 6px; font-size: 9px; }
+.chat-context { flex: 0 0 auto; margin: 12px 13px 0; border-radius: 7px; background: #f8f7ff; padding: 8px 9px; color: #827cb1; display: flex; align-items: center; gap: 6px; font-size: 9px; }
 .context-icon { font-size: 13px; }
-.chat-messages { flex: 1; min-height: 195px; max-height: 270px; overflow-y: auto; padding: 13px; display: flex; flex-direction: column; gap: 10px; }
+.chat-messages { flex: 1 1 auto; min-height: 150px; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .assistant-welcome { margin: auto; padding: 13px 9px 19px; text-align: center; display: flex; align-items: center; flex-direction: column; gap: 5px; max-width: 230px; }
 .welcome-orb { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #f2f0ff; color: #7769d0; font-size: 14px; margin-bottom: 3px; }
 .assistant-welcome strong { font-family: var(--font-display); font-size: 11px; }
@@ -230,7 +235,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .typing-dots span { width: 5px; height: 5px; background: #a29adf; border-radius: 50%; animation: pulse .8s infinite alternate; }
 .typing-dots span:nth-child(2) { animation-delay: .15s; }.typing-dots span:nth-child(3) { animation-delay: .3s; }
 @keyframes pulse { to { opacity: .3; transform: translateY(-2px); } }
-.suggestion-area { padding: 0 13px 11px; }
+.suggestion-area { flex: 0 0 auto; padding: 8px 13px 8px; }
 .suggestion-label { display: block; color: #b0b4c0; letter-spacing: .8px; font-size: 7px; font-weight: 800; margin: 0 0 6px; }
 .suggestion-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .suggestion-chip { padding: 5px 7px; color: #7774a5; background: #faf9ff; border: 1px solid #e9e7f7; border-radius: 6px; font-size: 8px; transition: .15s; }
@@ -238,7 +243,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .suggestion-toggle { color: #5548b5; border-style: dashed; font-weight: 700; }
 .suggestion-chip:hover:not(:disabled) { color: #5548b5; border-color: #cfc9f4; background: #f4f2ff; }
 .suggestion-chip:disabled { opacity: .55; cursor: not-allowed; }
-.chat-form { margin: 0 12px; padding: 5px 5px 5px 11px; display: flex; gap: 8px; align-items: center; border: 1px solid #e7e8ef; border-radius: 10px; background: #fcfcfe; }
+.chat-form { flex: 0 0 auto; margin: 0 12px; padding: 5px 5px 5px 11px; display: flex; gap: 8px; align-items: center; border: 1px solid #e7e8ef; border-radius: 10px; background: #fcfcfe; }
 .chat-form input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 10px; padding: 7px 0; }
 .chat-form input::placeholder { color: #adb2bf; }
 .chat-form input:disabled { cursor: not-allowed; }
@@ -246,7 +251,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
 .chat-form button:hover:not(:disabled) { background: #5140b4; }
 .chat-form button:disabled { background: #d8d5eb; cursor: not-allowed; }
 .chat-form button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.chat-footnote { padding: 9px 13px 11px; color: #a5aab6; font-size: 8px; text-align: center; }
+.chat-footnote { flex: 0 0 auto; padding: 8px 13px 10px; color: #a5aab6; font-size: 8px; text-align: center; }
 .chat-footnote span { color: #b7a866; margin-right: 3px; }
 
 .library-card { padding: 15px; background: #fff; border: 1px solid #e7e9f0; border-radius: 13px; box-shadow: 0 7px 22px rgba(41,45,80,.03); }
@@ -277,8 +282,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
   .hero-illustration { right: 10px; transform: scale(.83); transform-origin: right center; }
   .hero-copy { max-width: 480px; }
   .hero-copy h1 { font-size: 39px; }
-  .chat-card { min-height: 430px; }
-  .chat-messages { max-height: 230px; }
+  .chat-card { min-height: 0; max-height: none; }
+  .chat-messages { max-height: 260px; min-height: 160px; }
 }
 @media (max-width: 767.98px) {
   .topbar { height: 62px; }
@@ -305,7 +310,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(107, 88, 215
   .empty-state { min-height: 255px; }
   .summary-grid { grid-template-columns: 1fr; }
   .summary-card.summary-card-wide { grid-column: auto; }
-  .chat-card { min-height: 420px; }
+  .chat-card { min-height: 0; }
 }
 @media (max-width: 420px) {
   .connection-pill { font-size: 9px; padding: 6px 8px; }
@@ -467,10 +472,10 @@ body { font-size: 15px; }
 .model-notice strong { color: #6a5319; }
 
 /* Model chip: which local model is answering, switchable from the chat card. */
-.chat-model-row { position: relative; padding: 0 16px 10px; }
+.chat-model-row { position: relative; flex: 0 0 auto; padding: 8px 14px 0; }
 .model-chip {
-  display: flex; align-items: center; gap: 8px; width: 100%; max-width: 260px;
-  padding: 6px 10px; border-radius: 10px; border: 1px solid #e9e7f7;
+  display: flex; align-items: center; gap: 7px; width: 100%; max-width: 100%;
+  padding: 5px 9px; border-radius: 9px; border: 1px solid #e9e7f7;
   background: #faf9ff; color: #4b4a63; text-align: left; cursor: pointer;
   transition: border-color .15s, background .15s;
 }
@@ -478,9 +483,9 @@ body { font-size: 15px; }
 .model-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: #c9ccd6; flex: 0 0 auto; }
 .model-chip-dot[data-state="on"] { background: #38b27d; box-shadow: 0 0 0 3px rgba(56,178,125,.16); }
 .model-chip-dot[data-state="off"] { background: #e3a13c; box-shadow: 0 0 0 3px rgba(227,161,60,.16); }
-.model-chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.model-chip-label { font-size: 11px; font-weight: 700; color: #3f3d63; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.model-chip-sub { font-size: 9px; color: #9a97ac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-chip-text { display: flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.3; }
+.model-chip-label { font-size: 10.5px; font-weight: 700; color: #3f3d63; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-chip-sub { font-size: 9px; color: #9a97ac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .model-chip-caret { margin-left: auto; font-size: 10px; color: #8d8ab0; }
 
 .model-menu {
