@@ -367,7 +367,7 @@ class Repository:
     def _cosine(left: list[float], right: list[float]) -> float:
         if not left or len(left) != len(right):
             return 0.0
-        dot = sum(float(a) * float(b) for a, b in zip(left, right))
+        dot = sum(float(a) * float(b) for a, b in zip(left, right, strict=False))
         left_norm = math.sqrt(sum(float(a) ** 2 for a in left))
         right_norm = math.sqrt(sum(float(b) ** 2 for b in right))
         if not left_norm or not right_norm:

@@ -418,6 +418,16 @@ def selected_id(selection: dict[str, object] | None) -> str | None:
     return f"{selection['kind']}:{selection['value']}"
 
 
+def _display_label(value: object) -> str:
+    """Turn a stored path/label into something readable in the model chip."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    cleaned = text.replace("\\", "/").rstrip("/")
+    name = cleaned.rsplit("/", 1)[-1] or text
+    return name[:-5] if name.lower().endswith(".gguf") else name
+
+
 def describe(config: dict[str, object] | None = None) -> dict[str, object]:
     """Everything the Profile page needs to render the model picker."""
     from .llm import model_status
@@ -437,7 +447,7 @@ def describe(config: dict[str, object] | None = None) -> dict[str, object]:
             "available": status["available"],
             "backend": status["backend"],
             "label": status["label"],
-            "model": status["model"],
+            "model": _display_label(status["model"]),
         },
         "options": options(),
     }

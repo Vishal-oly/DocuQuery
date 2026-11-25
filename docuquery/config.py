@@ -50,7 +50,7 @@ class Config:
     """Application settings. Secrets are read only from the server environment."""
 
     SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "local-demo-key-change-before-deploy")
-    MAX_CONTENT_LENGTH = _int_env("MAX_UPLOAD_MB", 20) * 1024 * 1024
+    MAX_CONTENT_LENGTH = _int_env("MAX_UPLOAD_MB", 40) * 1024 * 1024
     # Scanned pages read through the optional OCR add-on; 0 disables it.
     OCR_MAX_PAGES = _int_env("OCR_MAX_PAGES", 20)
     # Keep paper tables as Markdown chunks (needs the optional pdfplumber add-on).

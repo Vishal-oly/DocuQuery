@@ -30,7 +30,7 @@ class HashingEmbedder:
         features: list[tuple[str, float]] = [(token, 1.0) for token in tokens]
         features.extend(
             (f"{left}_{right}", 0.42)
-            for left, right in zip(tokens, tokens[1:])
+            for left, right in zip(tokens, tokens[1:], strict=False)
         )
         for feature, weight in features:
             digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()

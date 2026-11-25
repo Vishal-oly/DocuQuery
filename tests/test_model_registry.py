@@ -155,3 +155,11 @@ def test_start_download_rejects_unknown_preset():
 
     with pytest.raises(ValueError):
         model_registry.start_download("gigantic")
+
+
+def test_display_label_strips_paths():
+    from docuquery import model_registry
+
+    assert model_registry._display_label("C:\\Users\\Vishal\\Downloads\\qwen.gguf") == "qwen"
+    assert model_registry._display_label("Qwen2.5 1.5B Instruct") == "Qwen2.5 1.5B Instruct"
+    assert model_registry._display_label("") == ""

@@ -120,7 +120,7 @@ def test_upload_stores_file_and_summary_download(tmp_path):
     # Regenerate the brief.
     regen = client.post(f"/api/papers/{paper['id']}/summarize")
     assert regen.status_code == 200
-    assert regen.get_json()["summary"]["mode"] == "extractive preview"
+    assert regen.get_json()["summary"]["mode"] == "Quick extract (model off)"
 
     # Delete removes the paper and its stored file.
     assert client.delete(f"/api/papers/{paper['id']}").status_code == 200

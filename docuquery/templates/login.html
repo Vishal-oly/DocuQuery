@@ -7,8 +7,8 @@
   <meta name="description" content="Sign in to DocuQuery or create a free account to save your scientific-paper research workspace.">
   <title>Login — DocuQuery</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=25) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=25) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=26) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=26) }}" rel="stylesheet">
 </head>
 <body class="auth-body">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -93,7 +93,7 @@
 
   <footer class="app-footer landing-footer">
     <span>DocuQuery <span class="footer-separator">·</span> RAG for scientific reading</span>
-    <span>Minor project · Built with Flask, SQLite &amp; Ollama</span>
+    <span>Minor project · Flask, SQLite &amp; a local GGUF model</span>
   </footer>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
@@ -103,7 +103,7 @@
       mode: {{ (mode or 'login')|tojson }}
     };
   </script>
-    <script src="{{ url_for('static', filename='dq.js', v=25) }}" defer></script>
-  <script src="{{ url_for('static', filename='auth.js', v=25) }}" defer></script>
+    <script src="{{ url_for('static', filename='dq.js', v=26) }}" defer></script>
+  <script src="{{ url_for('static', filename='auth.js', v=26) }}" defer></script>
 </body>
 </html>

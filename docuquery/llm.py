@@ -214,7 +214,7 @@ def _parse_json_object(text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         match = re.search(r"\{[\s\S]*\}", cleaned)
         if not match:
-            raise LLMError("The model did not return a valid structured summary.")
+            raise LLMError("The model did not return a valid structured summary.") from None
         try:
             value = json.loads(match.group(0))
         except json.JSONDecodeError as exc:
@@ -280,7 +280,7 @@ def answer_detail(config: dict[str, Any], detail: str | None = None) -> str:
 _NON_ENGLISH_WORDS = {
     # Spanish / Portuguese
     "qué", "que", "cuál", "cual", "cómo", "como", "por", "para", "objetivo", "método",
-    "resultados", "qual", "são", "não", "uma", "los", "las", "del", "resumen", "objetivo",
+    "resultados", "qual", "são", "não", "uma", "los", "las", "del", "resumen",
     # French
     "quel", "quelle", "comment", "pourquoi", "objectif", "méthode", "résultats", "avec",
     # German

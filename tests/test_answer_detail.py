@@ -56,7 +56,7 @@ def test_answer_question_passes_detail_to_model(monkeypatch):
                                  "session", PAPER, "How accurate is it?", "detailed")
 
     assert result["answer"] == "Generated answer [p. 2]."
-    assert result["mode"] == "Local model RAG"
+    assert result["mode"] == "Local model"
     assert captured["detail"] == "detailed"
 
 

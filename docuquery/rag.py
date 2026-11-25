@@ -1,5 +1,6 @@
 """RAG orchestration, citation formatting, and an offline extractive fallback."""
 
+import logging
 import re
 from typing import Any
 
@@ -48,6 +49,9 @@ SUMMARY_FIELDS = {
 }
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def sanitize_answer(text: str) -> str:
     """Keep page citations, drop the paper's own reference numbers.
 
@@ -56,7 +60,24 @@ def sanitize_answer(text: str) -> str:
     """
     if not text:
         return text
-    cleaned = _ANY_BRACKET.sub(lambda match: match.group(0) if _PAGE_REF.fullmatch(match.group(0)) else "", text)
+    def keep(match: re.Match) -> str:
+        value = match.group(0)
+        if _PAGE_REF.fullmatch(value):
+            return value
+        inner = value[1:-1].strip()
+        # Drop the paper's own numeric references ("[33.31]", "[1, 2]") but keep
+        # meaningful labels such as "[Figure 3]" or "[Table 2]".
+        return "" if re.fullmatch(r"[\d.,;:\s–—-]{1,24}", inner) else value
+
+    cleaned = _ANY_BRACKET.sub(keep, text)
+    # The chat bubble is plain text, so Markdown emphasis looks like clutter.
+    cleaned = re.sub(r"^\s{0,3}#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned, flags=re.DOTALL)
+    cleaned = re.sub(r"(?<![\w*])__(.+?)__(?![\w*])", r"\1", cleaned, flags=re.DOTALL)
+    cleaned = cleaned.replace("`", "")
+    cleaned = re.sub(r"^\s*\*\s+", "• ", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*[-•]\s+", "• ", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*\|?[\s:\-|]{6,}\|?\s*$", "", cleaned, flags=re.MULTILINE)
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\s+([.,;:])", r"\1", cleaned)
     cleaned = re.sub(r"(\[\s*p\.?\s*\d+\s*\])(?:\s*\1)+", r"\1", cleaned, flags=re.IGNORECASE)
@@ -320,18 +341,20 @@ def make_summary(repository, embedder, config: dict[str, Any], session_id: str, 
         int(config.get("SUMMARY_CONTEXT_CHARS", 9000)),
     )
     notice = None
-    mode = "extractive preview"
+    mode = "Quick extract (model off)"
     try:
         summary = generate_structured_summary(
             context,
             config,
         )
-        mode = "Local model RAG"
+        mode = "Local model"
     except LLMError as exc:
         summary = extractive_summary(chunks)
+        LOGGER.debug("Summary fell back to an extract: %s", exc)
         notice = (
-            "Showing a citation-linked extractive preview because no local model generated a summary. "
-            + str(exc)
+            "The local model is not running yet, so this is a quick extract built from the "
+            "paper's own sentences. Start the app with start.bat (or python local_ai.py) for a "
+            "written summary."
         )
     # Summaries copy reference numbers from the paper just as answers do.
     summary = {
@@ -370,7 +393,8 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
             "sources": [],
         }
 
-    if wants_questions(question):
+    question_mode = wants_questions(question)
+    if question_mode:
         # Question generation needs breadth: sample across the whole paper, not 4 near vectors.
         spread = _spread_chunks(repository, session_id, paper["id"])
         known = {_chunk_identity(chunk) for chunk in chunks}
@@ -386,7 +410,7 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
 
     context = format_context(chunks, paper.get("filename", "paper.pdf"), int(config.get("ANSWER_CONTEXT_CHARS", 12000)))
     try:
-        if wants_questions(question):
+        if question_mode:
             mcq = wants_mcq(question)
             count = int(config.get("MCQ_COUNT" if mcq else "QUESTION_COUNT", 5 if mcq else 8))
             answer = generate_questions(context, config, count=count,
@@ -399,11 +423,11 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
                 config,
                 detail,
             )
-            mode = "Local model RAG"
+            mode = "Local model"
         answer = sanitize_answer(answer)
     except LLMError as exc:
         answer = sanitize_answer(_fallback_answer(exc, chunks))
-        mode = "Retrieval preview — model offline"
+        mode = "Passages only (model off)"
     if translated:
         mode = f"{mode} · asked in another language"
     return {"answer": answer, "mode": mode, "sources": sources}

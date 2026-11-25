@@ -7,8 +7,8 @@
   <meta name="description" content="DocuQuery — a retrieval-augmented research assistant for scientific paper PDFs. Upload a paper, get an evidence-grounded brief, and ask questions with page-linked sources.">
   <title>DocuQuery — Scientific Paper Research Assistant</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=25) }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='auth.css', v=25) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=26) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='auth.css', v=26) }}" rel="stylesheet">
 </head>
 <body class="landing-body">
   <a class="skip-link" href="#mainContent">Skip to content</a>
@@ -219,10 +219,10 @@
 
   <footer class="app-footer landing-footer">
     <span>DocuQuery <span class="footer-separator">·</span> RAG for scientific reading</span>
-    <span>Minor project · Built with Flask, SQLite &amp; Ollama</span>
+    <span>Minor project · Flask, SQLite &amp; a local GGUF model</span>
   </footer>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='auth.js', v=25) }}" defer></script>
+  <script src="{{ url_for('static', filename='auth.js', v=26) }}" defer></script>
 </body>
 </html>

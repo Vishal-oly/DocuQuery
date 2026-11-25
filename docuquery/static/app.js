@@ -170,7 +170,8 @@
   }
 
   function addMessage(role, text, sources = [], mode = '') {
-    if (assistantWelcome && assistantWelcome.isConnected) assistantWelcome.remove();    const message = document.createElement('div');
+    if (assistantWelcome && assistantWelcome.isConnected) assistantWelcome.remove();
+    const message = document.createElement('div');
     message.className = `chat-message ${role}`;
     message.append(textElement('div', 'chat-bubble', text));
     if (role === 'assistant' && sources.length) {
@@ -278,15 +279,25 @@
     browseButton.disabled = isUploading;
     uploadProgress.hidden = !isUploading;
     if (isUploading) {
-      uploadProgressBar.style.width = '12%';
+      uploadProgressBar.style.width = '10%';
       uploadProgressLabel.textContent = 'Reading pages and indexing passages…';
-      let progress = 12;
+      const startedAt = Date.now();
+      let progress = 10;
       window.clearInterval(uploadTimer);
       uploadTimer = window.setInterval(() => {
-        progress = Math.min(progress + 7, 88);
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        // Creep towards 92% without ever freezing, so long PDFs still show movement.
+        progress += Math.max(0.4, (92 - progress) * 0.07);
+        progress = Math.min(progress, 92);
         uploadProgressBar.style.width = `${progress}%`;
-        if (progress > 65) uploadProgressLabel.textContent = 'Preparing your evidence-grounded brief…';
-      }, 520);
+        if (elapsed < 10) {
+          uploadProgressLabel.textContent = 'Reading pages and indexing passages…';
+        } else if (elapsed < 30) {
+          uploadProgressLabel.textContent = 'Still indexing — larger PDFs take a minute or two…';
+        } else {
+          uploadProgressLabel.textContent = `Still indexing… ${elapsed}s elapsed, hang on.`;
+        }
+      }, 400);
     } else {
       window.clearInterval(uploadTimer);
       uploadProgressBar.style.width = '100%';
@@ -404,23 +415,6 @@
       updateChatContext(null);
       $('#footerStatus').textContent = 'Ready when you are';
       await refreshModelChip();
-      try {
-        const download = await api('/api/models/download');
-        if (download.state === 'downloading' && download.id) {
-          const sub = $('#modelChipSub');
-          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
-          downloadTimer = window.setInterval(async () => {
-            const status = await api('/api/models/download');
-            const sub2 = $('#modelChipSub');
-            if (sub2 && status.state === 'downloading') {
-              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
-            } else {
-              stopDownloadPolling();
-              refreshModelChip();
-            }
-          }, 2000);
-        }
-      } catch (error) { /* status is optional */ }
       await loadLibrary();
       showToast('Paper removed from this session.');
       $('#dropZone').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -618,29 +612,16 @@
         showToast(`${option.label || option.id} downloaded. It is now the selected model.`);
         if (item) item.disabled = false;
         await refreshModelChip();
-      try {
-        const download = await api('/api/models/download');
-        if (download.state === 'downloading' && download.id) {
-          const sub = $('#modelChipSub');
-          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
-          downloadTimer = window.setInterval(async () => {
-            const status = await api('/api/models/download');
-            const sub2 = $('#modelChipSub');
-            if (sub2 && status.state === 'downloading') {
-              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
-            } else {
-              stopDownloadPolling();
-              refreshModelChip();
-            }
-          }, 2000);
-        }
-      } catch (error) { /* status is optional */ }
       } else if (status.state === 'error') {
         showToast(status.error || 'Download failed. Check your internet connection.');
         if (meta) meta.textContent = 'download failed · click to retry';
         if (item) item.disabled = false;
         const chipSub = $('#modelChipSub');
         if (chipSub) chipSub.textContent = 'not loaded · start.bat';
+      } else {
+        // Nothing in flight any more (server restarted, or the file is already here).
+        stopDownloadPolling();
+        await refreshModelChip();
       }
     } catch (error) {
       stopDownloadPolling();
@@ -749,18 +730,10 @@
       try {
         const download = await api('/api/models/download');
         if (download.state === 'downloading' && download.id) {
-          const sub = $('#modelChipSub');
-          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
-          downloadTimer = window.setInterval(async () => {
-            const status = await api('/api/models/download');
-            const sub2 = $('#modelChipSub');
-            if (sub2 && status.state === 'downloading') {
-              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
-            } else {
-              stopDownloadPolling();
-              refreshModelChip();
-            }
-          }, 2000);
+          // A download was already running (e.g. the tab was reloaded): keep watching it.
+          const option = { id: download.id, label: download.label || 'model' };
+          stopDownloadPolling();
+          downloadTimer = window.setInterval(() => pollDownload(option, null, null), 2000);
         }
       } catch (error) { /* status is optional */ }
       await loadLibrary();

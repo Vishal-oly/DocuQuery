@@ -9,6 +9,7 @@ import uuid
 from itsdangerous import URLSafeTimedSerializer
 
 from io import BytesIO
+from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -503,11 +504,19 @@ def upload_pdf():
     if not upload or not upload.filename:
         return jsonify({"error": "Choose a PDF file to upload."}), 400
     filename = secure_filename(upload.filename)
-    if not filename or not filename.lower().endswith(".pdf"):
-        return jsonify({"error": "Only PDF files are supported."}), 400
+    if not filename.lower().endswith(".pdf"):
+        # Non-Latin names (Hindi, Chinese, ...) lose everything in secure_filename,
+        # so keep a readable fallback instead of rejecting a real PDF.
+        suffix = Path(filename).suffix.lower()
+        if suffix and suffix != ".pdf":
+            return jsonify({"error": "Only PDF files are supported."}), 400
+        stem = Path(filename).stem if filename else ""
+        filename = f"{stem if stem and stem != 'pdf' else 'paper'}.pdf"
 
     try:
         raw = upload.read()
+        if not raw.lstrip()[:5].startswith(b"%PDF-"):
+            return jsonify({"error": "That file does not look like a PDF. Try exporting it again."}), 400
         parsed = parse_pdf_bytes(
             raw, filename,
             ocr_max_pages=int(current_app.config.get("OCR_MAX_PAGES", 20)),
@@ -538,7 +547,7 @@ def upload_pdf():
         }
         chunk_rows = []
         fallback_chunks = []
-        for raw_chunk, embedding in zip(parsed["chunks"], vectors):
+        for raw_chunk, embedding in zip(parsed["chunks"], vectors, strict=False):
             row = {
                 "id": str(uuid.uuid4()),
                 "paper_id": paper_id,
@@ -583,9 +592,11 @@ def upload_pdf():
         return jsonify({"error": str(exc)}), 400
     except (RepositoryError, EmbeddingError) as exc:
         return jsonify({"error": str(exc)}), 503
-    except Exception as exc:
+    except Exception:
         current_app.logger.exception("PDF upload failed")
-        return jsonify({"error": f"Could not process this PDF: {exc}"}), 500
+        return jsonify(
+            {"error": "Could not process this PDF. It may be corrupted or password protected."}
+        ), 500
 
 
 @bp.post("/api/papers/<paper_id>/ask")
@@ -615,9 +626,11 @@ def ask_paper(paper_id: str):
         return jsonify({"error": str(exc)}), 503
     except EmbeddingError as exc:
         return jsonify({"error": str(exc)}), 503
-    except Exception as exc:
+    except Exception:
         current_app.logger.exception("Question answering failed")
-        return jsonify({"error": f"Could not answer this question: {exc}"}), 500
+        return jsonify(
+            {"error": "Could not answer that question. Try rephrasing it or ask about another section."}
+        ), 500
 
 
 @bp.delete("/api/papers/<paper_id>")

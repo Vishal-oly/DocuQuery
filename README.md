@@ -221,7 +221,7 @@ Copy `.env.example` to `.env` to change settings. Highlights:
 | `OPENAI_BASE_URL` | local server URL, e.g. `http://127.0.0.1:1234/v1` |
 | `LOCAL_AI_MODEL_URL` | use a different GGUF file for the built-in runtime |
 | `LOCAL_AI_PORT` | port for the built-in model server (default `8080`) |
-| `MAX_UPLOAD_MB` | upload limit (default 20) |
+| `MAX_UPLOAD_MB` | upload limit in MB (default 40) |
 | `FLASK_SECRET_KEY` | set a unique value for your installation |
 
 Data lives next to the app:

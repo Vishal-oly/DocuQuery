@@ -174,10 +174,11 @@
   function renderModels(payload) {
     modelState = payload;
     const ram = payload.ram_gb ? `${payload.ram_gb} GB RAM` : 'memory unknown';
+    const recommended = payload.recommended_label ? ` · recommended: ${payload.recommended_label}` : '';
     $('#modelHardware').textContent =
-      `${ram} · recommended: ${payload.recommended_label}${payload.managed ? ' · switching is automatic' : ''}`;
+      `${ram}${recommended}${payload.managed ? ' · switching is automatic' : ''}`;
     const list = $('#modelOptions');
-    list.innerHTML = '';
+    list.replaceChildren();
     (payload.options || []).forEach((option) => {
       const label = document.createElement('label');
       label.className = 'model-option';
@@ -191,9 +192,11 @@
       const title = document.createElement('strong');
       title.textContent = option.label;
       const meta = document.createElement('span');
-      const parts = [`${option.size_mb} MB`, option.source];
+      const parts = [];
+      if (option.size_mb) parts.push(`${option.size_mb} MB`);
+      if (option.source) parts.push(option.source);
       if (option.recommended) parts.push('recommended');
-      if (!option.downloaded) parts.push('downloads on first use');
+      if (option.kind === 'preset' && !option.downloaded) parts.push('downloads when you pick it');
       meta.textContent = parts.join(' · ');
       copy.append(title, meta);
       label.append(radio, copy);
@@ -226,6 +229,11 @@
         body: JSON.stringify({ id: picked.value }),
       });
       $('#modelNote').textContent = result.message || 'Saved.';
+      const chosen = ((modelState && modelState.options) || []).find((option) => option.id === picked.value);
+      if (chosen && chosen.kind === 'preset' && !chosen.downloaded) {
+        await startModelDownload(chosen, picked.value);
+        return;
+      }
       if (result.managed) {
         setTimeout(loadStatus, 6000);
         setTimeout(loadModels, 6000);
@@ -235,6 +243,47 @@
       $('#modelApply').disabled = false;
     }
   });
+
+  async function startModelDownload(option, id) {
+    const note = $('#modelNote');
+    note.textContent = `Downloading ${option.label} — internet is needed only this once…`;
+    try {
+      await api('/api/models/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch (error) {
+      note.textContent = error.message;
+      $('#modelApply').disabled = false;
+      return;
+    }
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await api('/api/models/download');
+        if (status.state === 'downloading') {
+          const percent = status.percent === null || status.percent === undefined
+            ? `${status.received_mb || 0} MB`
+            : `${status.percent}%`;
+          note.textContent = `Downloading ${option.label} — ${percent}`;
+          return;
+        }
+        window.clearInterval(timer);
+        if (status.state === 'done') {
+          note.textContent = `${option.label} is ready and selected.`;
+          await loadModels();
+          await loadStatus();
+        } else if (status.state === 'error') {
+          note.textContent = status.error || 'Download failed. Check your internet connection.';
+          $('#modelApply').disabled = false;
+        }
+      } catch (error) {
+        window.clearInterval(timer);
+        note.textContent = error.message;
+        $('#modelApply').disabled = false;
+      }
+    }, 2000);
+  }
 
   $('#nameForm').addEventListener('submit', async (event) => {
     event.preventDefault();

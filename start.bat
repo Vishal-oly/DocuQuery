@@ -6,18 +6,28 @@ REM  dependencies and starts the server.
 REM ================================================
 cd /d "%~dp0"
 
+set "PYEXE=python"
 python --version >nul 2>nul
 if errorlevel 1 (
-    echo Python is not installed or not in PATH.
-    echo Install Python 3 from https://python.org and try again.
-    pause
-    exit /b 1
+    py -3 --version >nul 2>nul
+    if errorlevel 1 (
+        echo Python is not installed or not in PATH.
+        echo Install Python 3 from https://python.org, tick "Add python.exe to PATH",
+        echo then run start.bat again.
+        pause
+        exit /b 1
+    )
+    set "PYEXE=py -3"
 )
 
 if not exist ".venv\Scripts\python.exe" (
     echo [1/3] First run - creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 exit /b 1
+    %PYEXE% -m venv .venv
+    if errorlevel 1 (
+        echo Could not create the virtual environment.
+        pause
+        exit /b 1
+    )
 ) else (
     echo [1/3] Virtual environment found.
 )

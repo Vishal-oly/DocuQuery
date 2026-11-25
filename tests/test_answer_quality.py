@@ -189,3 +189,21 @@ def test_english_question_is_not_translated(monkeypatch):
         {"id": "p", "filename": "paper.pdf"}, "what methods were used?",
     )
     assert "another language" not in result["mode"]
+
+
+def test_sanitize_keeps_figure_and_table_labels():
+    cleaned = rag.sanitize_answer("See [Figure 3] and [Table 2] plus [33.31] at [p. 12].")
+    assert "[Figure 3]" in cleaned
+    assert "[Table 2]" in cleaned
+    assert "[33.31]" not in cleaned
+    assert "[p. 12]" in cleaned
+
+
+def test_sanitize_strips_markdown_for_the_plain_text_bubble():
+    cleaned = rag.sanitize_answer(
+        "## Findings\n**Main idea:** uses **attention** [p. 3].\n- First point [p. 4]\n| --- | --- |\nUse `softmax`."
+    )
+    assert "**" not in cleaned and "`" not in cleaned and "##" not in cleaned
+    assert "Main idea:" in cleaned
+    assert "• First point [p. 4]" in cleaned
+    assert "---" not in cleaned

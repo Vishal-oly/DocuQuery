@@ -103,7 +103,7 @@ def test_upload_chat_and_account_scoping(tmp_path):
     assert paper["page_count"] == 1
     assert "session_id" not in paper
     assert payload["chunk_count"] > 0
-    assert payload["summary"]["mode"] == "extractive preview"
+    assert payload["summary"]["mode"] == "Quick extract (model off)"
     assert payload["summary"]["sources"]
 
     answer = client.post(
@@ -231,3 +231,24 @@ def test_workspace_chat_form_lives_inside_the_chat_card(tmp_path):
     classes = [item.get("class") or "" for item in parser.parents]
     assert any("chat-card" in value for value in classes), classes
     assert any("side-column" in value for value in classes), classes
+
+
+def test_upload_accepts_non_latin_filename_and_rejects_fake_pdf(tmp_path):
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, name="Nisha", email="nisha@example.com")
+
+    hindi = client.post(
+        "/api/upload",
+        data={"pdf": (BytesIO(SAMPLE_PDF.read_bytes()), "रिपोर्ट.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert hindi.status_code == 201, hindi.get_json()
+    assert hindi.get_json()["paper"]["filename"].endswith(".pdf")
+
+    fake = client.post(
+        "/api/upload",
+        data={"pdf": (BytesIO(b"this is not a pdf at all"), "report.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert fake.status_code == 400
+    assert "does not look like a PDF" in fake.get_json()["error"]
