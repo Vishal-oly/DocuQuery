@@ -7,7 +7,7 @@
   <meta name="description" content="A source-grounded research paper PDF summarizer powered by retrieval-augmented generation.">
   <title>DocuQuery — Research Paper Assistant</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=19) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=21) }}" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to workspace</a>
@@ -162,6 +162,18 @@
             <button type="button" class="chat-clear-btn" id="clearChatButton" title="Clear chat history">Clear</button>
             <span class="chat-live-dot" title="Ready"></span>
           </div>
+          <div class="chat-model-row">
+            <button type="button" class="model-chip" id="modelChip" aria-haspopup="listbox" aria-expanded="false"
+                    title="Which local model answers your questions">
+              <span class="model-chip-dot" id="modelChipDot" data-state="off"></span>
+              <span class="model-chip-text">
+                <span class="model-chip-label" id="modelChipLabel">Checking model…</span>
+                <span class="model-chip-sub" id="modelChipSub">local · offline</span>
+              </span>
+              <span class="model-chip-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="model-menu" id="modelMenu" role="listbox" aria-label="Available local models" hidden></div>
+          </div>
           <div class="chat-context" id="chatContext"><span class="context-icon">⌕</span><span>Upload a paper to start asking</span></div>
           <div class="chat-messages" id="chatMessages" aria-live="polite">
             <div class="assistant-welcome" id="assistantWelcome">
@@ -223,7 +235,7 @@
   </main>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='dq.js', v=19) }}" defer></script>
-  <script src="{{ url_for('static', filename='app.js', v=19) }}" defer></script>
+  <script src="{{ url_for('static', filename='dq.js', v=21) }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v=21) }}" defer></script>
 </body>
 </html>

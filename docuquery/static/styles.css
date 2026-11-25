@@ -465,3 +465,43 @@ body { font-size: 15px; }
 .model-notice-icon { font-size: 13px; line-height: 1.4; }
 .model-notice code { background: #fdf1d8; border-radius: 4px; padding: 1px 5px; font-size: 11px; }
 .model-notice strong { color: #6a5319; }
+
+/* Model chip: which local model is answering, switchable from the chat card. */
+.chat-model-row { position: relative; padding: 0 16px 10px; }
+.model-chip {
+  display: flex; align-items: center; gap: 8px; width: 100%; max-width: 260px;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid #e9e7f7;
+  background: #faf9ff; color: #4b4a63; text-align: left; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.model-chip:hover { border-color: #cfc9f4; background: #f4f2ff; }
+.model-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: #c9ccd6; flex: 0 0 auto; }
+.model-chip-dot[data-state="on"] { background: #38b27d; box-shadow: 0 0 0 3px rgba(56,178,125,.16); }
+.model-chip-dot[data-state="off"] { background: #e3a13c; box-shadow: 0 0 0 3px rgba(227,161,60,.16); }
+.model-chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.model-chip-label { font-size: 11px; font-weight: 700; color: #3f3d63; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-chip-sub { font-size: 9px; color: #9a97ac; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-chip-caret { margin-left: auto; font-size: 10px; color: #8d8ab0; }
+
+.model-menu {
+  position: absolute; left: 16px; right: 16px; top: calc(100% - 4px); z-index: 40;
+  max-height: 300px; overflow-y: auto; padding: 6px; border-radius: 12px;
+  background: #fff; border: 1px solid #e7e5f3; box-shadow: 0 14px 34px rgba(48,42,92,.14);
+}
+.model-menu-title {
+  font-size: 9px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase;
+  color: #a3a0b8; padding: 7px 8px 4px;
+}
+.model-menu-item {
+  display: flex; flex-direction: column; gap: 1px; width: 100%; padding: 7px 9px;
+  border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer;
+}
+.model-menu-item:hover:not(:disabled) { background: #f5f3ff; }
+.model-menu-item.is-current { background: #f0edff; }
+.model-menu-name { font-size: 11px; font-weight: 700; color: #3f3d63; }
+.model-menu-meta { font-size: 9px; color: #9a97ac; }
+.model-menu-foot {
+  display: block; margin-top: 4px; padding: 8px 9px; border-top: 1px solid #f0eef8;
+  font-size: 10px; font-weight: 700; color: #6b5cd6; text-decoration: none;
+}
+.model-menu-foot:hover { color: #4f42b5; }

@@ -403,6 +403,7 @@
       sendButton.disabled = true;
       updateChatContext(null);
       $('#footerStatus').textContent = 'Ready when you are';
+      await refreshModelChip();
       await loadLibrary();
       showToast('Paper removed from this session.');
       $('#dropZone').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -444,6 +445,35 @@
   if (window.DQAuth && window.DQAuth.bindForm) {
     window.DQAuth.bindForm('#chatForm', '#sendButton', ['#chatInput']);
   }
+  const modelChip = $('#modelChip');
+  if (modelChip) {
+    modelChip.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const menu = $('#modelMenu');
+      if (!menu) return;
+      const open = menu.hidden;
+      menu.hidden = !open;
+      modelChip.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', (event) => {
+      const menu = $('#modelMenu');
+      if (!menu || menu.hidden) return;
+      if (!menu.contains(event.target) && event.target !== modelChip) {
+        menu.hidden = true;
+        modelChip.setAttribute('aria-expanded', 'false');
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        const menu = $('#modelMenu');
+        if (menu && !menu.hidden) {
+          menu.hidden = true;
+          modelChip.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+  }
+
   const moreToggle = $('#moreQuestionsToggle');
   if (moreToggle) {
     moreToggle.addEventListener('click', () => {
@@ -482,6 +512,111 @@
     });
   });
 
+  /* ---- model chip: show which local model is answering, and switch it ---- */
+
+  function shortModelName(label) {
+    return String(label || 'Local model')
+      .replace(/Qwen2\.5\s*/i, 'Qwen2.5 ')
+      .replace(/\s*Instruct/i, '')
+      .replace(/\s*GGUF/i, '')
+      .replace(/\s*\(not loaded\)/i, '')
+      .trim()
+      .slice(0, 26);
+  }
+
+  function renderModelMenu(payload) {
+    const menu = $('#modelMenu');
+    if (!menu) return;
+    menu.replaceChildren();
+    const options = payload.options || [];
+    const presets = options.filter((option) => option.kind === 'preset');
+    const files = options.filter((option) => option.kind !== 'preset');
+    const addGroup = (title, items) => {
+      if (!items.length) return;
+      menu.append(textElement('div', 'model-menu-title', title));
+      items.forEach((option) => {
+        const isCurrent = option.id === payload.selected_id;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'model-menu-item' + (isCurrent ? ' is-current' : '');
+        item.dataset.modelId = option.id;
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(Boolean(isCurrent)));
+        const top = document.createElement('span');
+        top.className = 'model-menu-name';
+        top.textContent = option.label || option.id;
+        const meta = document.createElement('span');
+        meta.className = 'model-menu-meta';
+        const bits = [];
+        if (option.size_mb) bits.push(`${option.size_mb} MB`);
+        if (option.source && option.kind !== 'preset') bits.push(option.source);
+        if (option.kind === 'preset') bits.push(option.downloaded ? 'downloaded' : 'needs download');
+        if (isCurrent) bits.push('in use');
+        meta.textContent = bits.join(' · ');
+        item.append(top, meta);
+        item.addEventListener('click', () => selectModel(option, item));
+        menu.append(item);
+      });
+    };
+    addGroup('Recommended presets', presets);
+    addGroup('GGUF files on this laptop', files);
+    const foot = document.createElement('a');
+    foot.className = 'model-menu-foot';
+    foot.href = '/profile';
+    foot.textContent = 'Add or download more models →';
+    menu.append(foot);
+  }
+
+  async function selectModel(option, item) {
+    const menu = $('#modelMenu');
+    item.disabled = true;
+    try {
+      const result = await api('/api/models/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: option.id }),
+      });
+      $('#modelChipLabel').textContent = shortModelName(option.label || option.id);
+      showToast(result.message || 'Model saved.');
+      if (result.managed) {
+        window.setTimeout(refreshModelChip, 6000);
+      }
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      item.disabled = false;
+      if (menu) menu.hidden = true;
+      const chip = $('#modelChip');
+      if (chip) chip.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  async function refreshModelChip() {
+    try {
+      const payload = await api('/api/models');
+      const options = payload.options || [];
+      const current = options.find((option) => option.id === payload.selected_id);
+      const label = (current && current.label) || (payload.current && payload.current.model) || 'Local model';
+      const running = Boolean(payload.current && payload.current.available);
+      const chipLabel = $('#modelChipLabel');
+      const chipSub = $('#modelChipSub');
+      const dot = $('#modelChipDot');
+      if (chipLabel) chipLabel.textContent = shortModelName(label);
+      if (chipSub) {
+        chipSub.textContent = running ? 'running · offline' : 'not loaded · start.bat';
+      }
+      if (dot) dot.dataset.state = running ? 'on' : 'off';
+      const chip = $('#modelChip');
+      if (chip) chip.title = running
+        ? `${label} is answering your questions`
+        : `${label} is selected but not running yet — start it with start.bat`;
+      renderModelMenu(payload);
+    } catch (error) {
+      const chipLabel = $('#modelChipLabel');
+      if (chipLabel) chipLabel.textContent = 'Model unavailable';
+    }
+  }
+
   async function initialize() {
     setPaperSectionsEnabled(false);
     try {
@@ -506,6 +641,7 @@
       } else if (notice) {
         notice.hidden = true;
       }
+      await refreshModelChip();
       await loadLibrary();
     } catch (error) {
       $('#connectionPill').dataset.mode = 'offline';

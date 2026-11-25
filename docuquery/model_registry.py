@@ -97,6 +97,64 @@ def _library_dirs() -> list[tuple[str, Path]]:
     return unique
 
 
+def ollama_models_dir() -> Path:
+    override = os.environ.get("OLLAMA_MODELS", "").strip()
+    return Path(override) if override else Path.home() / ".ollama" / "models"
+
+
+def scan_ollama_models(limit: int = 10) -> list[dict[str, object]]:
+    """Ollama stores weights as plain GGUF blobs, so they can be loaded directly."""
+    root = ollama_models_dir()
+    manifests = root / "manifests"
+    blobs = root / "blobs"
+    if not manifests.is_dir() or not blobs.is_dir():
+        return []
+    found: list[dict[str, object]] = []
+    try:
+        manifest_files = sorted(manifests.rglob("*"))
+    except OSError:
+        return []
+    for manifest in manifest_files:
+        if not manifest.is_file():
+            continue
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8", errors="ignore") or "{}")
+        except (OSError, json.JSONDecodeError):
+            continue
+        tag = manifest.name
+        name = manifest.parent.name
+        for layer in data.get("layers", []):
+            if not isinstance(layer, dict):
+                continue
+            if layer.get("mediaType") != "application/vnd.ollama.image.model":
+                continue
+            digest = str(layer.get("digest") or "").replace(":", "-")
+            if not digest:
+                continue
+            blob = blobs / digest
+            if not blob.is_file():
+                continue
+            try:
+                size_mb = blob.stat().st_size // (1024 * 1024)
+            except OSError:
+                continue
+            if size_mb < MIN_GGUF_MB:
+                continue
+            found.append({
+                "id": f"file:{blob}",
+                "kind": "file",
+                "label": f"{name}:{tag} (Ollama)",
+                "path": str(blob),
+                "size_mb": size_mb,
+                "source": "Ollama",
+                "downloaded": True,
+            })
+            break
+        if len(found) >= limit:
+            break
+    return found
+
+
 def scan_models(limit: int = 20) -> list[dict[str, object]]:
     """Find GGUF files already present on this laptop."""
     found: list[dict[str, object]] = []
@@ -126,6 +184,12 @@ def scan_models(limit: int = 20) -> list[dict[str, object]]:
             })
             if len(found) >= limit:
                 return found
+    # Ollama keeps GGUF weights in a blob store; list them so people can reuse
+    # models they already downloaded with another tool.
+    known_paths = {str(item["path"]) for item in found}
+    for extra in scan_ollama_models(limit=limit - len(found)):
+        if extra["path"] not in known_paths:
+            found.append(extra)
     return found
 
 

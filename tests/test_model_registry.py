@@ -72,3 +72,27 @@ def test_find_option_and_describe(monkeypatch, tmp_path):
     assert info["recommended"] in registry.PRESETS
     assert info["current"]["available"] is False
     assert any(entry["recommended"] for entry in info["options"])
+
+
+def test_ollama_blobs_are_offered_as_models(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    blobs = tmp_path / "models" / "blobs"
+    blobs.mkdir(parents=True)
+    manifest = tmp_path / "models" / "manifests" / "registry.ollama.ai" / "library" / "qwen2.5" / "1.5b"
+    manifest.parent.mkdir(parents=True)
+    blob = blobs / "sha256-abc123"
+    with open(blob, "wb") as handle:
+        handle.truncate(200 * 1024 * 1024)
+    manifest.write_text(
+        '{"layers": [{"mediaType": "application/vnd.ollama.image.model",'
+        ' "digest": "sha256:abc123", "size": 209715200}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OLLAMA_MODELS", str(tmp_path / "models"))
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path / "empty"))
+
+    found = model_registry.scan_ollama_models()
+    assert found and found[0]["source"] == "Ollama"
+    assert found[0]["label"].startswith("qwen2.5:1.5b")
+    assert found[0]["path"].endswith("sha256-abc123")

@@ -111,6 +111,26 @@ retrieve the real numbers and cite the page. Symbol-heavy equations are tagged
 small retrieval boost. `TABLE_EXTRACTION=false` disables table parsing. Formulas are quoted
 as text (LaTeX is not rendered) — the model explains them in plain words.
 
+### Which models show up (and where to add more)
+
+The workspace chat card shows a **model chip** — it names the model that is answering and
+turns amber when nothing is loaded. Click it to switch instantly; the full picker (with
+hardware advice and download state) is on the Profile page.
+
+The list is built from what is actually on the laptop:
+
+| Source | How it gets there |
+|---|---|
+| Built-in presets | `python local_ai.py --model small\|default\|large` downloads once |
+| `models/` folder | drop any `.gguf` in it |
+| **LM Studio** | its own model library is scanned automatically |
+| **Ollama** | GGUF blobs in `~/.ollama/models` are offered as `qwen2.5:1.5b (Ollama)` |
+| Bionic | `~/.bionic/models` |
+| Any folder | set `EXTRA_MODEL_DIRS="D:\models;E:\gguf"` before `start.bat` |
+
+Models installed by another app therefore appear on their own — no re-download. Switching from
+the chip saves the choice; `start.bat` loads it next time.
+
 ### Model choice: automatic, saved, or switched from the app
 
 On the first run DocuQuery looks at the laptop's RAM and picks a model:
