@@ -62,6 +62,10 @@ def sanitize_answer(text: str) -> str:
     return cleaned.strip()
 
 
+def wants_mcq(question: str) -> bool:
+    return bool(re.search(r"\b(mcq|mcqs|multiple[- ]choice|objective questions?)\b", question or "", re.IGNORECASE))
+
+
 def wants_questions(question: str) -> bool:
     return bool(QUESTION_INTENT.search(question or "") and QUESTION_TRIGGER.search(question or ""))
 
@@ -374,8 +378,11 @@ def answer_question(repository, embedder, config: dict[str, Any], session_id: st
     context = format_context(chunks, paper.get("filename", "paper.pdf"), int(config.get("ANSWER_CONTEXT_CHARS", 12000)))
     try:
         if wants_questions(question):
-            answer = generate_questions(context, config, count=int(config.get("QUESTION_COUNT", 8)))
-            mode = "Generated questions"
+            mcq = wants_mcq(question)
+            count = int(config.get("MCQ_COUNT" if mcq else "QUESTION_COUNT", 5 if mcq else 8))
+            answer = generate_questions(context, config, count=count,
+                                        style="mcq" if mcq else "exam")
+            mode = "Generated MCQ quiz" if mcq else "Generated questions"
         else:
             answer = answer_from_context(
                 question,

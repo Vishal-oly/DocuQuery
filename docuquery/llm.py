@@ -271,7 +271,8 @@ def answer_detail(config: dict[str, Any], detail: str | None = None) -> str:
     return choice if choice in DETAIL_STYLES else "balanced"
 
 
-def generate_questions(context: str, config: dict[str, Any], count: int = 8) -> str:
+def generate_questions(context: str, config: dict[str, Any], count: int = 8,
+                       style: str = "exam") -> str:
     """Turn retrieved passages into exam-style questions the paper can answer."""
     max_tokens = int(config.get("SUMMARY_MAX_TOKENS") or 900)
     system = (
@@ -280,6 +281,32 @@ def generate_questions(context: str, config: dict[str, Any], count: int = 8) -> 
         "marker of the passage it comes from, for example [p. 12]. Cite pages only in that "
         "form; never copy the paper's own reference numbers such as [33.31]."
     )
+    if style == "mcq":
+        system = (
+            "You are an exam-setter reading a scientific paper. Write multiple-choice questions "
+            "that the supplied passages can answer. Never invent facts. Use the passage's own "
+            "page marker in the answer key, for example [p. 12]."
+        )
+        user = f"""Write {count} multiple-choice questions from these paper passages.
+
+Format exactly like this:
+1. <question>
+   A) <option>
+   B) <option>
+   C) <option>
+   D) <option>
+   Answer: <letter> — <one short sentence why> [p. N]
+
+Rules: exactly four options per question, only one correct, no introductions, no closing summary.
+
+Paper passages:
+{context}"""
+        return _chat(
+            config,
+            [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_tokens=max_tokens,
+        )
+
     user = f"""Write {count} questions from these paper passages.
 
 Format exactly like this:

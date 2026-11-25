@@ -7,7 +7,7 @@
   <meta name="description" content="A source-grounded research paper PDF summarizer powered by retrieval-augmented generation.">
   <title>DocuQuery — Research Paper Assistant</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='styles.css', v=16) }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='styles.css', v=17) }}" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to workspace</a>
@@ -174,6 +174,15 @@
               <button type="button" class="suggestion-chip" data-question="What were the key findings?">Findings</button>
               <button type="button" class="suggestion-chip" data-question="What limitations do the authors mention?">Limits</button>
               <button type="button" class="suggestion-chip" data-question="Give me 8 exam questions from this paper with page references.">Exam questions</button>
+              <button type="button" class="suggestion-chip suggestion-toggle" id="moreQuestionsToggle" aria-expanded="false" aria-controls="moreQuestionChips">+ 6 more</button>
+            </div>
+            <div class="suggestion-chips suggestion-chips-extra" id="moreQuestionChips" hidden>
+              <button type="button" class="suggestion-chip" data-question="Define the key technical terms this paper uses.">Key terms</button>
+              <button type="button" class="suggestion-chip" data-question="List the main equations or formulas in this paper and the page where each appears.">Formulas</button>
+              <button type="button" class="suggestion-chip" data-question="Summarise the main tables in this paper and the numbers they report.">Tables</button>
+              <button type="button" class="suggestion-chip" data-question="How does this work compare with the baselines or prior work?">Comparison</button>
+              <button type="button" class="suggestion-chip" data-question="Give me 5 multiple choice questions with four options each, the correct answer, and the page reference.">MCQ quiz</button>
+              <button type="button" class="suggestion-chip" data-question="Give me 5 viva or interview questions a teacher might ask about this paper.">Viva questions</button>
             </div>
           </div>
           </div>
@@ -209,7 +218,7 @@
   </main>
 
   <div id="toast" class="toast-message" role="status" aria-live="polite" hidden></div>
-  <script src="{{ url_for('static', filename='dq.js', v=16) }}" defer></script>
-  <script src="{{ url_for('static', filename='app.js', v=16) }}" defer></script>
+  <script src="{{ url_for('static', filename='dq.js', v=17) }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v=17) }}" defer></script>
 </body>
 </html>

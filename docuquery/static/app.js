@@ -170,7 +170,7 @@
     updateChatContext(paper);
     chatInput.disabled = false;
     sendButton.disabled = false;
-    document.querySelectorAll('.suggestion-chip').forEach((button) => { button.disabled = false; });
+    document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => { button.disabled = false; });
     loadLibrary();
   }
 
@@ -308,7 +308,7 @@
     addMessage('user', cleanQuestion);
     chatInput.value = '';
     sendButton.disabled = true;
-    document.querySelectorAll('.suggestion-chip').forEach((button) => { button.disabled = true; });
+    document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => { button.disabled = true; });
     showTyping();
     try {
       const payload = await api(`/api/papers/${encodeURIComponent(activePaper.id)}/ask`, {
@@ -365,7 +365,7 @@
       $('#typingIndicator')?.remove();
       chatMessages.replaceChildren();
       if (assistantWelcome) chatMessages.append(assistantWelcome);
-      document.querySelectorAll('.suggestion-chip').forEach((button) => {
+      document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => {
         button.disabled = !activePaper;
       });
       sendButton.disabled = !activePaper;
@@ -384,7 +384,18 @@
   if (window.DQAuth && window.DQAuth.bindForm) {
     window.DQAuth.bindForm('#chatForm', '#sendButton', ['#chatInput']);
   }
-  document.querySelectorAll('.suggestion-chip').forEach((button) => {
+  const moreToggle = $('#moreQuestionsToggle');
+  if (moreToggle) {
+    moreToggle.addEventListener('click', () => {
+      const extra = $('#moreQuestionChips');
+      if (!extra) return;
+      const open = extra.hidden;
+      extra.hidden = !open;
+      moreToggle.setAttribute('aria-expanded', String(open));
+      moreToggle.textContent = open ? 'Show less' : '+ 6 more';
+    });
+  }
+  document.querySelectorAll('.suggestion-chip[data-question]').forEach((button) => {
     button.disabled = true;
     button.addEventListener('click', () => sendQuestion(button.dataset.question));
   });

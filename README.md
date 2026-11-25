@@ -64,6 +64,13 @@ offline. Pages without a text layer are recognised automatically; `OCR_MAX_PAGES
 
 ### Asking for questions
 
+The chat offers twelve one-click questions: six on the first row (Objective, Methods,
+Dataset, Findings, Limits, Exam questions) and six behind **+ 6 more** (Key terms, Formulas,
+Tables, Comparison, MCQ quiz, Viva questions). They are ordinary prompts, so you can always
+type your own wording; `QUESTION_COUNT` (default 8) and `MCQ_COUNT` (default 5) set how many
+questions the generator writes.
+
+
 "Give me 8 exam questions from this paper" is handled by a dedicated prompt: the app samples
 passages across the whole paper (not just the nearest four), asks the model to write
 short- and long-answer questions, and tags each with its page marker. The `Exam questions`

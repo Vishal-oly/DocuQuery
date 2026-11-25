@@ -64,8 +64,9 @@ def test_spread_chunks_covers_the_whole_paper():
 def test_answer_question_uses_question_generator(monkeypatch):
     calls = {}
 
-    def fake_questions(context, config, count=8):
+    def fake_questions(context, config, count=8, style="exam"):
         calls["count"] = count
+        calls["style"] = style
         return "1. What is the scattering phase shift? [p. 3]"
 
     monkeypatch.setattr(rag, "generate_questions", fake_questions)
@@ -76,8 +77,32 @@ def test_answer_question_uses_question_generator(monkeypatch):
         {"id": "p", "filename": "paper.pdf"}, "give me some questions from this pdf",
     )
     assert calls["count"] == 8
+    assert calls["style"] == "exam"
     assert result["mode"] == "Generated questions"
     assert "[p. 3]" in result["answer"]
+
+
+def test_mcq_intent_uses_quiz_style(monkeypatch):
+    calls = {}
+
+    def fake_questions(context, config, count=5, style="exam"):
+        calls.update(count=count, style=style)
+        return "1. Question?\n   A) one\n   B) two\n   C) three\n   D) four\n   Answer: B — reason [p. 2]"
+
+    monkeypatch.setattr(rag, "generate_questions", fake_questions)
+    result = rag.answer_question(
+        FakeRepository(_chunks(10)), _FakeEmbedder(), {}, "s",
+        {"id": "p", "filename": "paper.pdf"},
+        "Give me 5 multiple choice questions with four options each",
+    )
+    assert calls == {"count": 5, "style": "mcq"}
+    assert result["mode"] == "Generated MCQ quiz"
+
+
+def test_mcq_detection():
+    assert rag.wants_mcq("give me mcqs from this paper")
+    assert rag.wants_mcq("multiple-choice questions please")
+    assert not rag.wants_mcq("give me exam questions")
 
 
 def test_answer_question_adds_intro_chunks_for_broad_questions(monkeypatch):

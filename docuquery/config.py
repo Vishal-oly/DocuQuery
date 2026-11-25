@@ -55,6 +55,9 @@ class Config:
     OCR_MAX_PAGES = _int_env("OCR_MAX_PAGES", 20)
     # Keep paper tables as Markdown chunks (needs the optional pdfplumber add-on).
     TABLE_EXTRACTION = os.getenv("TABLE_EXTRACTION", "true").lower() == "true"
+    # How many questions the "Exam questions" / "MCQ quiz" chips generate.
+    QUESTION_COUNT = _int_env("QUESTION_COUNT", 8)
+    MCQ_COUNT = _int_env("MCQ_COUNT", 5)
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
