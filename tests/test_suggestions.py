@@ -48,7 +48,10 @@ def test_suggestions_are_paper_specific_and_get_consumed(tmp_path):
     questions = payload["questions"]
     assert questions, payload
     assert all(question.endswith("?") for question in questions)
-    assert payload["cached"] is False
+    # Questions are seeded during the upload itself, so the chat card has them at once.
+    assert payload["cached"] is True
+    # No model in tests, so nothing better is coming: no need for the UI to poll.
+    assert payload["ready"] is True
 
     # Second call is served from the stored list, not regenerated.
     again = client.get(f"/api/papers/{paper['id']}/suggestions", headers=headers).get_json()
@@ -93,3 +96,37 @@ def test_fallback_questions_use_the_paper_content():
     assert any("91.4" in q or "accuracy" in q.lower() for q in questions)
     assert any("Limitations" in q for q in questions)
     assert all(q.endswith("?") for q in questions)
+
+
+def test_background_pass_upgrades_questions_when_a_model_answers(tmp_path, monkeypatch):
+    """With a model running, the placeholder list is replaced without blocking the upload."""
+    import threading as real_threading
+    from types import SimpleNamespace
+
+    from docuquery import rag, routes
+
+    class ImmediateThread:
+        def __init__(self, target=None, name=None, daemon=None):
+            self._target = target
+
+        def start(self):
+            self._target()
+
+    monkeypatch.setattr(
+        routes,
+        "threading",
+        SimpleNamespace(Lock=real_threading.Lock, Thread=ImmediateThread),
+    )
+    monkeypatch.setattr(routes, "_model_reachable", lambda config: True)
+    better = [
+        "How does the page-aware retriever keep every citation on the right page?",
+        "What accuracy does the demo study report for its retrieval step?",
+    ]
+    monkeypatch.setattr(rag, "model_questions", lambda *args, **kwargs: list(better))
+
+    client, headers = make_client(tmp_path)
+    paper = upload(client, headers)
+
+    payload = client.get(f"/api/papers/{paper['id']}/suggestions", headers=headers).get_json()
+    assert payload["questions"] == better
+    assert payload["ready"] is True

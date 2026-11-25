@@ -424,6 +424,14 @@
     if (actions) actions.hidden = false;
   }
 
+  async function fetchSuggestions(paper) {
+    return api(`/api/papers/${encodeURIComponent(paper.id)}/suggestions`, { timeoutMs: 180000 });
+  }
+
+  function suggestionList(payload) {
+    return (payload.questions || []).filter((item) => String(item || '').trim());
+  }
+
   async function loadSuggestions(paper) {
     suggestionState.token += 1;
     const requestId = suggestionState.token;
@@ -439,16 +447,38 @@
     suggestionState.questions = [];
     suggestionState.loading = true;
     renderSuggestions();
+
+    let payload;
     try {
-      const payload = await api(`/api/papers/${encodeURIComponent(paper.id)}/suggestions`, { timeoutMs: 180000 });
-      if (requestId !== suggestionState.token) return;
-      suggestionState.questions = (payload.questions || []).filter((item) => String(item || '').trim());
+      payload = await fetchSuggestions(paper);
     } catch (error) {
-      if (requestId !== suggestionState.token) return;
-      suggestionState.questions = [];
-    } finally {
       if (requestId === suggestionState.token) {
         suggestionState.loading = false;
+        renderSuggestions();
+      }
+      return;
+    }
+    if (requestId !== suggestionState.token) return;
+    suggestionState.questions = suggestionList(payload);
+    suggestionState.loading = false;
+    renderSuggestions();
+
+    // The text-derived list shows up instantly; the model keeps working in the
+    // background and quietly replaces it with sharper questions when ready.
+    let attempts = 0;
+    while (!payload.ready && attempts < 16 && requestId === suggestionState.token) {
+      attempts += 1;
+      await new Promise((resolve) => window.setTimeout(resolve, 2500));
+      if (requestId !== suggestionState.token) return;
+      try {
+        payload = await fetchSuggestions(paper);
+      } catch (error) {
+        return;
+      }
+      if (requestId !== suggestionState.token) return;
+      const fresh = suggestionList(payload);
+      if (fresh.length && fresh.join('|') !== suggestionState.questions.join('|')) {
+        suggestionState.questions = fresh;
         renderSuggestions();
       }
     }

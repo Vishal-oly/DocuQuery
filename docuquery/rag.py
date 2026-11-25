@@ -447,18 +447,19 @@ def _fallback_questions(chunks: list[dict[str, Any]], paper: dict[str, Any], lim
     return unique
 
 
-def suggest_questions(repository, embedder, config: dict[str, Any], session_id: str,
-                      paper: dict[str, Any], count: int = 8) -> list[str]:
-    """Pick questions worth asking about this paper, model first, heuristics second."""
+def quick_questions(chunks: list[dict[str, Any]], paper: dict[str, Any], limit: int = 8) -> list[str]:
+    """Instant questions built from the text alone, so the chat card is never empty."""
+    return _fallback_questions(chunks, paper, limit=limit)
+
+
+def model_questions(repository, config: dict[str, Any], session_id: str,
+                    paper: dict[str, Any], count: int = 8) -> list[str]:
+    """Model-written questions; raises LLMError when no model is serving."""
     chunks = _spread_chunks(repository, session_id, paper["id"], limit=7)
     if not chunks:
-        return []
+        raise LLMError("No passages were stored for this paper.")
     context = format_context(chunks, paper.get("filename", "paper.pdf"), 9000)
-    try:
-        return llm_suggest_questions(context, config, count=count)
-    except LLMError as exc:
-        LOGGER.debug("Falling back to heuristic question suggestions: %s", exc)
-        return _fallback_questions(chunks, paper, limit=count)
+    return llm_suggest_questions(context, config, count=count)
 
 
 def answer_question(repository, embedder, config: dict[str, Any], session_id: str, paper: dict[str, Any], question: str, detail: str | None = None) -> dict[str, Any]:

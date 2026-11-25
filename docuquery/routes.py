@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from functools import wraps
 import json
 import re
+import threading
 import uuid
 
 from itsdangerous import URLSafeTimedSerializer
@@ -576,6 +577,9 @@ def upload_pdf():
         summary["sources"] = sources
         paper["summary"] = summary
         repository.update_summary(session_id, paper_id, summary)
+        app_object = current_app._get_current_object()
+        _store_quick_suggestions(repository, session_id, paper, chunk_rows)
+        _schedule_suggestions(app_object, session_id, paper_id)
 
         return jsonify(
             {
@@ -599,6 +603,78 @@ def upload_pdf():
         ), 500
 
 
+_SUGGESTION_LOCK = threading.Lock()
+_SUGGESTION_INFLIGHT: set[str] = set()
+
+
+def _model_reachable(config) -> bool:
+    try:
+        return bool(model_status(config).get("available"))
+    except Exception:
+        return False
+
+
+def _store_quick_suggestions(repository, session_id: str, paper: dict, chunks: list[dict]) -> None:
+    """Write text-derived questions right away so the chips are instant."""
+    from .rag import quick_questions
+
+    summary = dict(paper.get("summary") or {})
+    if summary.get("suggestions"):
+        return
+    questions = quick_questions(chunks, paper)
+    if not questions:
+        return
+    summary["suggestions"] = questions
+    summary["suggestions_source"] = "heuristic"
+    try:
+        repository.update_summary(session_id, paper["id"], summary)
+    except RepositoryError:
+        current_app.logger.debug("Could not store the quick question list", exc_info=True)
+
+
+def _schedule_suggestions(app, session_id: str, paper_id: str) -> None:
+    """Ask the local model for better questions in the background, without blocking anyone."""
+    if not _model_reachable(app.config):
+        return
+    with _SUGGESTION_LOCK:
+        if paper_id in _SUGGESTION_INFLIGHT:
+            return
+        _SUGGESTION_INFLIGHT.add(paper_id)
+
+    def worker() -> None:
+        from .llm import LLMError
+        from .rag import model_questions
+
+        try:
+            with app.app_context():
+                repository = _repository()
+                paper = repository.get_paper(session_id, paper_id)
+                if not paper:
+                    return
+                summary = dict(paper.get("summary") or {})
+                if summary.get("suggestions_source") == "model" or summary.get("asked_questions"):
+                    return
+                questions = model_questions(repository, app.config, session_id, paper)
+                fresh = repository.get_paper(session_id, paper_id)
+                if not fresh:
+                    return
+                latest = dict(fresh.get("summary") or {})
+                if latest.get("asked_questions") or latest.get("suggestions_source") == "model":
+                    return
+                latest["suggestions"] = questions
+                latest["suggestions_source"] = "model"
+                repository.update_summary(session_id, paper_id, latest)
+        except LLMError as exc:
+            app.logger.debug("Keeping text-derived questions: %s", exc)
+        except Exception:
+            app.logger.debug("Background question generation failed", exc_info=True)
+        finally:
+            with _SUGGESTION_LOCK:
+                _SUGGESTION_INFLIGHT.discard(paper_id)
+
+    threading.Thread(target=worker, name=f"dq-suggestions-{paper_id[:8]}", daemon=True).start()
+
+
 def _normalise_question(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip().lower()
 
@@ -606,9 +682,7 @@ def _normalise_question(text: str) -> str:
 @bp.get("/api/papers/<paper_id>/suggestions")
 @api_login_required
 def paper_suggestions(paper_id: str):
-    """Questions worth asking about this paper; the model writes them for one paper."""
-    from .rag import suggest_questions
-
+    """Questions worth asking about this paper; the model refines them in the background."""
     session_id = _session_id()
     try:
         repository = _repository()
@@ -618,21 +692,25 @@ def paper_suggestions(paper_id: str):
         summary = dict(paper.get("summary") or {})
         asked = [_normalise_question(item) for item in summary.get("asked_questions") or []]
         questions = [str(item) for item in summary.get("suggestions") or [] if str(item).strip()]
-        generated = bool(questions)
+        source = str(summary.get("suggestions_source") or "")
+        cached = bool(questions)
         if not questions:
-            questions = suggest_questions(
-                repository, _embedder(), current_app.config, session_id, paper
-            )
-            if questions:
-                summary["suggestions"] = questions
-                repository.update_summary(session_id, paper_id, summary)
+            chunks = repository.list_chunks(session_id, paper_id)
+            _store_quick_suggestions(repository, session_id, paper, chunks)
+            refreshed = repository.get_paper(session_id, paper_id) or paper
+            summary = dict(refreshed.get("summary") or {})
+            questions = [str(item) for item in summary.get("suggestions") or [] if str(item).strip()]
+            source = str(summary.get("suggestions_source") or "")
+        _schedule_suggestions(current_app._get_current_object(), session_id, paper_id)
         remaining = [item for item in questions if _normalise_question(item) not in asked]
+        ready = source == "model" or not _model_reachable(current_app.config)
         return jsonify(
             {
                 "questions": remaining,
                 "total": len(questions),
                 "asked": len(questions) - len(remaining),
-                "cached": generated,
+                "cached": cached,
+                "ready": ready,
             }
         )
     except RepositoryError as exc:
@@ -852,6 +930,10 @@ def summarize_paper(paper_id: str):
             fallback,
         )
         summary["sources"] = sources
+        previous = dict(paper.get("summary") or {})
+        for key in ("suggestions", "suggestions_source", "asked_questions"):
+            if key in previous:
+                summary[key] = previous[key]
         paper["summary"] = summary
         _repository().update_summary(session_id, paper_id, summary)
         return jsonify({"paper": _public_paper(paper), "summary": summary})
