@@ -459,10 +459,20 @@ body { font-size: 15px; }
 .connection-pill[data-mode="offline"] .status-dot { background: #d66a67; box-shadow: 0 0 0 3px rgba(214,106,103,.14); }
 
 .chat-detail-select {
-  border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted);
-  font-family: var(--font-display); font-size: 11px; padding: 5px 7px; margin-left: auto;
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  border: 1px solid var(--line); border-radius: 8px; background-color: #fff; color: var(--muted);
+  font-family: var(--font-display); font-size: 11px; font-weight: 600; line-height: 1.5;
+  padding: 5px 24px 5px 9px; margin-left: auto; cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238b8f9a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; background-size: 10px 6px;
+  transition: border-color .15s, box-shadow .15s;
 }
 .chat-detail-select:hover { border-color: #c9c2b4; }
+.chat-detail-select:focus,
+.chat-detail-select:focus-visible {
+  outline: none; border-color: #b9aef0; box-shadow: 0 0 0 3px rgba(107, 88, 215, .14);
+}
+.chat-detail-select option { color: #3d4453; background: #fff; }
 
 .landing-privacy-line {
   display: inline-flex; align-items: center; gap: 7px; margin: 14px 0 0;

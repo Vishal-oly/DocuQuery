@@ -71,3 +71,14 @@ def test_answer_question_defaults_to_config_style(monkeypatch):
     chunks = [{"content": "Evidence text.", "page_number": 1}]
     rag.answer_question(FakeRepo(chunks), FakeEmbedder(), {}, "s", PAPER, "q?")
     assert captured["detail"] is None
+
+
+def test_detail_switch_survives_bad_input_and_matches_ui_values():
+    """The chat dropdown sends brief/balanced/detailed; anything else means balanced."""
+    assert set(llm.DETAIL_STYLES) == {"brief", "balanced", "detailed"}
+    assert llm.answer_detail({}, "detailed") == "detailed"
+    assert llm.answer_detail({}, "Detailed ") == "detailed"
+    assert llm.answer_detail({}, "gigantic") == "balanced"
+    assert llm.answer_detail({"ANSWER_DETAIL": "brief"}, None) == "brief"
+    budgets = [llm.DETAIL_STYLES[name][1] for name in ("brief", "balanced", "detailed")]
+    assert budgets == sorted(budgets) and len(set(budgets)) == 3

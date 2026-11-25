@@ -36,6 +36,21 @@ exactly like llama.cpp does (`GET /v1/models`, `POST /v1/chat/completions`).
 | Regenerate brief keeps suggestions and asked history | pass |
 | `.md` export, library listing | pass |
 
+### Answer-length switch (Short / Balanced / Detailed)
+
+Verified three ways, because a dropdown that silently does nothing is easy to ship:
+
+- the request the UI sends carries `detail: brief|balanced|detailed`;
+- the server turns that into a different instruction and a different token budget
+  (300 / 700 / 1100 tokens), proved by a spy on the model call **and** by a stub
+  model that echoes the budget it received;
+- the choice is remembered in `localStorage` and restored after a reload;
+- invalid or missing values fall back to balanced, and `ANSWER_MAX_TOKENS` still
+  overrides all three presets.
+
+The select also got a custom chevron, brand focus ring and readable option colours,
+because the browser default rendered as a thick black box on Windows.
+
 ## 3. Browser-level checks (real page, real JS)
 
 The workspace, summaries, profile, landing, login and forgot pages were loaded in a
