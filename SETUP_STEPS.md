@@ -257,6 +257,7 @@ Backup: app band karke poora **`instance`** folder copy kar lo. Purana Supabase 
 Chat card ke andar **model chip** hai (Balanced dropdown ke neeche) — usme current model ka naam dikhta hai.
 
 - **Chip click karo** → list khulti hai: presets + laptop par pade saare GGUF files
+- **Model download bhi ho jayega** — chip mein jo preset "click to download" dikh raha hai, uspe click karo. Progress chip par dikhega (`downloading 42%`), poora hone par wahi model select ho jayega
 - **Naya model add karna hai?** koi bhi `.gguf` file `models\` folder mein daal do, phir page refresh
 - **LM Studio / Ollama se download kiya hua model?** wo khud list mein aa jayega (`qwen2.5:1.5b (Ollama)` naam se) — dobara download ki zaroorat nahi
 - Kisi aur folder mein models hain? `start.bat` se pehle: `set EXTRA_MODEL_DIRS=D:\models`

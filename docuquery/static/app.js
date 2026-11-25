@@ -404,6 +404,23 @@
       updateChatContext(null);
       $('#footerStatus').textContent = 'Ready when you are';
       await refreshModelChip();
+      try {
+        const download = await api('/api/models/download');
+        if (download.state === 'downloading' && download.id) {
+          const sub = $('#modelChipSub');
+          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
+          downloadTimer = window.setInterval(async () => {
+            const status = await api('/api/models/download');
+            const sub2 = $('#modelChipSub');
+            if (sub2 && status.state === 'downloading') {
+              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
+            } else {
+              stopDownloadPolling();
+              refreshModelChip();
+            }
+          }, 2000);
+        }
+      } catch (error) { /* status is optional */ }
       await loadLibrary();
       showToast('Paper removed from this session.');
       $('#dropZone').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -550,11 +567,16 @@
         const bits = [];
         if (option.size_mb) bits.push(`${option.size_mb} MB`);
         if (option.source && option.kind !== 'preset') bits.push(option.source);
-        if (option.kind === 'preset') bits.push(option.downloaded ? 'downloaded' : 'needs download');
+        const needsDownload = option.kind === 'preset' && !option.downloaded;
+        if (option.kind === 'preset') bits.push(option.downloaded ? 'downloaded' : 'click to download');
         if (isCurrent) bits.push('in use');
         meta.textContent = bits.join(' · ');
         item.append(top, meta);
-        item.addEventListener('click', () => selectModel(option, item));
+        if (needsDownload) item.dataset.downloadPreset = option.id;
+        item.addEventListener('click', () => {
+          if (needsDownload) startPresetDownload(option, item, meta);
+          else selectModel(option, item);
+        });
         menu.append(item);
       });
     };
@@ -565,6 +587,86 @@
     foot.href = '/profile';
     foot.textContent = 'Add or download more models →';
     menu.append(foot);
+  }
+
+  let downloadTimer = null;
+
+  function stopDownloadPolling() {
+    if (downloadTimer) {
+      window.clearInterval(downloadTimer);
+      downloadTimer = null;
+    }
+  }
+
+  async function pollDownload(option, item, meta) {
+    try {
+      const status = await api('/api/models/download');
+      const percent = status.percent;
+      const chipSub = $('#modelChipSub');
+      if (status.state === 'downloading') {
+        const progress = percent === null || percent === undefined
+          ? `${status.received_mb} MB`
+          : `${percent}%`;
+        if (meta) meta.textContent = `${option.label || option.id} · downloading ${progress}`;
+        if (chipSub) chipSub.textContent = `downloading ${progress}`;
+        return;
+      }
+      stopDownloadPolling();
+      if (status.state === 'done') {
+        showToast(`${option.label || option.id} downloaded. It is now the selected model.`);
+        if (item) item.disabled = false;
+        await refreshModelChip();
+      try {
+        const download = await api('/api/models/download');
+        if (download.state === 'downloading' && download.id) {
+          const sub = $('#modelChipSub');
+          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
+          downloadTimer = window.setInterval(async () => {
+            const status = await api('/api/models/download');
+            const sub2 = $('#modelChipSub');
+            if (sub2 && status.state === 'downloading') {
+              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
+            } else {
+              stopDownloadPolling();
+              refreshModelChip();
+            }
+          }, 2000);
+        }
+      } catch (error) { /* status is optional */ }
+      } else if (status.state === 'error') {
+        showToast(status.error || 'Download failed. Check your internet connection.');
+        if (meta) meta.textContent = 'download failed · click to retry';
+        if (item) item.disabled = false;
+        const chipSub = $('#modelChipSub');
+        if (chipSub) chipSub.textContent = 'not loaded · start.bat';
+      }
+    } catch (error) {
+      stopDownloadPolling();
+      if (item) item.disabled = false;
+      showToast(error.message);
+    }
+  }
+
+  async function startPresetDownload(option, item, meta) {
+    item.disabled = true;
+    if (meta) meta.textContent = 'starting download…';
+    try {
+      const started = await api('/api/models/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: option.id }),
+      });
+      if (started.status && started.status.state === 'downloading') {
+        showToast('Downloading the model — this needs internet only this once.');
+      }
+      stopDownloadPolling();
+      downloadTimer = window.setInterval(() => pollDownload(option, item, meta), 1500);
+      pollDownload(option, item, meta);
+    } catch (error) {
+      showToast(error.message);
+      item.disabled = false;
+      if (meta) meta.textContent = 'click to download';
+    }
   }
 
   async function selectModel(option, item) {
@@ -642,6 +744,23 @@
         notice.hidden = true;
       }
       await refreshModelChip();
+      try {
+        const download = await api('/api/models/download');
+        if (download.state === 'downloading' && download.id) {
+          const sub = $('#modelChipSub');
+          if (sub) sub.textContent = `downloading ${download.percent === null ? '' : download.percent + '%'}`.trim();
+          downloadTimer = window.setInterval(async () => {
+            const status = await api('/api/models/download');
+            const sub2 = $('#modelChipSub');
+            if (sub2 && status.state === 'downloading') {
+              sub2.textContent = `downloading ${status.percent === null ? '' : status.percent + '%'}`.trim();
+            } else {
+              stopDownloadPolling();
+              refreshModelChip();
+            }
+          }, 2000);
+        }
+      } catch (error) { /* status is optional */ }
       await loadLibrary();
     } catch (error) {
       $('#connectionPill').dataset.mode = 'offline';

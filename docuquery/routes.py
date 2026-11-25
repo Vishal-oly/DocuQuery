@@ -451,6 +451,29 @@ def api_select_model():
     })
 
 
+@bp.post("/api/models/download")
+@api_login_required
+def api_download_model():
+    """Fetch a built-in preset in the background; the UI polls the status route."""
+    from .model_registry import start_download
+
+    payload = request.get_json(silent=True) or {}
+    preset = str(payload.get("id") or "").replace("preset:", "").strip()
+    try:
+        status = start_download(preset)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "status": status}), 202
+
+
+@bp.get("/api/models/download")
+@api_login_required
+def api_download_status():
+    from .model_registry import download_status
+
+    return jsonify(download_status())
+
+
 @bp.get("/api/papers")
 @api_login_required
 def list_papers():

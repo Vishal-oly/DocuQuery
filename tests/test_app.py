@@ -170,3 +170,27 @@ def test_health_reports_optional_features(tmp_path):
     assert "ocr_available" in payload
     assert "tables_available" in payload
     assert payload["llm_label"] in {"Local model (llama.cpp)", "Model not loaded", "Local model"}
+
+
+def test_download_routes_are_wired(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    client = make_test_app(tmp_path).test_client()
+    register_and_login(client, email="downloader@example.com")
+    login = client.post("/api/login", json={"email": "downloader@example.com", "password": "secret123"})
+    headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
+
+    status = client.get("/api/models/download", headers=headers)
+    assert status.status_code == 200
+    assert status.get_json()["state"] in {"idle", "downloading", "done", "error"}
+
+    started = {"called": False}
+
+    def fake_start(preset):
+        started["called"] = preset
+        return {"state": "downloading", "id": preset}
+
+    monkeypatch.setattr(model_registry, "start_download", fake_start)
+    response = client.post("/api/models/download", json={"id": "preset:small"}, headers=headers)
+    assert response.status_code == 202
+    assert started["called"] == "small"

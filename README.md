@@ -131,6 +131,11 @@ The list is built from what is actually on the laptop:
 Models installed by another app therefore appear on their own — no re-download. Switching from
 the chip saves the choice; `start.bat` loads it next time.
 
+Presets that are not on disk show **click to download** — clicking starts the download inside the
+app (progress is shown on the chip, `POST /api/models/download` + `GET /api/models/download`), and
+the finished model becomes the selected one. Only the built-in presets can be downloaded this way;
+the URLs come from a fixed list, never from user input.
+
 ### Model choice: automatic, saved, or switched from the app
 
 On the first run DocuQuery looks at the laptop's RAM and picks a model:

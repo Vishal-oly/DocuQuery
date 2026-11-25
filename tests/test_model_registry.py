@@ -96,3 +96,62 @@ def test_ollama_blobs_are_offered_as_models(tmp_path, monkeypatch):
     assert found and found[0]["source"] == "Ollama"
     assert found[0]["label"].startswith("qwen2.5:1.5b")
     assert found[0]["path"].endswith("sha256-abc123")
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        self._payload = payload
+        self._pos = 0
+        self.headers = {"Content-Length": str(len(payload))}
+
+    def read(self, size: int = -1) -> bytes:
+        if self._pos >= len(self._payload):
+            return b""
+        end = len(self._payload) if size < 0 else self._pos + size
+        chunk = self._payload[self._pos:end]
+        self._pos = end
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_download_preset_writes_the_file(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    monkeypatch.setattr(model_registry, "MIN_GGUF_MB", 1)
+    payload = b"G" * (2 * 1024 * 1024)
+
+    path = model_registry.download_preset(
+        "small", opener=lambda request, timeout=60: _FakeResponse(payload))
+    assert path.exists() and path.stat().st_size == len(payload)
+    assert model_registry.download_status()["received"] > 0
+
+
+def test_download_preset_falls_back_to_second_url(tmp_path, monkeypatch):
+    from docuquery import model_registry
+
+    monkeypatch.setenv("MODELS_DIR", str(tmp_path))
+    monkeypatch.setattr(model_registry, "MIN_GGUF_MB", 1)
+    calls = {"count": 0}
+
+    def opener(request, timeout=60):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise OSError("primary mirror down")
+        return _FakeResponse(b"G" * (2 * 1024 * 1024))
+
+    path = model_registry.download_preset("small", opener=opener)
+    assert calls["count"] == 2
+    assert path.exists()
+
+
+def test_start_download_rejects_unknown_preset():
+    from docuquery import model_registry
+
+    with pytest.raises(ValueError):
+        model_registry.start_download("gigantic")

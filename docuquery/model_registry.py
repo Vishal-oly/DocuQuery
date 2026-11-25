@@ -15,6 +15,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -191,6 +193,108 @@ def scan_models(limit: int = 20) -> list[dict[str, object]]:
         if extra["path"] not in known_paths:
             found.append(extra)
     return found
+
+
+# ---------------------------------------------------------------------------
+# In-app download of the built-in presets
+# ---------------------------------------------------------------------------
+
+_DOWNLOAD = {
+    "id": None,
+    "label": "",
+    "state": "idle",     # idle | downloading | done | error
+    "received": 0,
+    "total": 0,
+    "error": "",
+}
+_DOWNLOAD_LOCK = threading.Lock()
+CHUNK_BYTES = 1024 * 1024
+
+
+def download_status() -> dict[str, object]:
+    with _DOWNLOAD_LOCK:
+        snapshot = dict(_DOWNLOAD)
+    total = int(snapshot.get("total") or 0)
+    received = int(snapshot.get("received") or 0)
+    snapshot["percent"] = round(received * 100 / total, 1) if total else None
+    snapshot["received_mb"] = round(received / (1024 * 1024), 1)
+    snapshot["total_mb"] = round(total / (1024 * 1024), 1) if total else None
+    return snapshot
+
+
+def _set_download(**changes: object) -> None:
+    with _DOWNLOAD_LOCK:
+        _DOWNLOAD.update(changes)
+
+
+def download_preset(preset: str, opener=None) -> Path:
+    """Fetch a preset GGUF into the models folder (called from a worker thread)."""
+    if preset not in PRESETS:
+        raise ValueError("Unknown model preset.")
+    meta = PRESETS[preset]
+    destination = preset_path(preset)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_suffix(destination.suffix + ".part")
+    urls = [str(meta["url"])] + ([str(meta["fallback_url"])] if meta.get("fallback_url") else [])
+    open_url = opener or urllib.request.urlopen
+    last_error: Exception | None = None
+    for url in urls:
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "DocuQuery/offline"})
+            with open_url(request, timeout=60) as response:
+                total = int(response.headers.get("Content-Length") or 0)
+                _set_download(state="downloading", received=0, total=total, error="")
+                received = 0
+                with open(partial, "wb") as handle:
+                    while True:
+                        chunk = response.read(CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+                        received += len(chunk)
+                        _set_download(received=received)
+            if partial.stat().st_size < MIN_GGUF_MB * 1024 * 1024:
+                raise OSError("The downloaded file is smaller than expected.")
+            os.replace(partial, destination)
+            return destination
+        except Exception as exc:  # try the fallback URL, then report
+            last_error = exc
+            try:
+                partial.unlink()
+            except OSError:
+                pass
+    raise OSError(
+        "Download failed — check your internet connection and try again. "
+        f"(details: {last_error})"
+    )
+
+
+def start_download(preset: str) -> dict[str, object]:
+    """Begin downloading a preset in the background; safe to call twice."""
+    if preset not in PRESETS:
+        raise ValueError("Unknown model preset.")
+    with _DOWNLOAD_LOCK:
+        if _DOWNLOAD["state"] == "downloading":
+            return download_status()
+        _DOWNLOAD.update({
+            "id": preset,
+            "label": str(PRESETS[preset]["label"]),
+            "state": "downloading",
+            "received": 0,
+            "total": int(PRESETS[preset]["approx_mb"]) * 1024 * 1024,
+            "error": "",
+        })
+
+    def worker() -> None:
+        try:
+            download_preset(preset)
+            write_selection("preset", preset, str(PRESETS[preset]["label"]))
+            _set_download(state="done")
+        except Exception as exc:
+            _set_download(state="error", error=str(exc))
+
+    threading.Thread(target=worker, name=f"download-{preset}", daemon=True).start()
+    return download_status()
 
 
 # ---------------------------------------------------------------------------
